@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider paths (v1.2.0 Share): Direct files anywhere on shared
+     storage, plus temp zips in cacheDir (folder shares zip first). -->
+<paths>
+    <external-path name="external" path="." />
+    <cache-path name="cache" path="." />
+</paths>
