@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
@@ -40,6 +41,10 @@ import androidx.compose.ui.unit.dp
  *
  * Step 4 runs a real probe and includes Mobile Legends as the explicit
  * test case, plus the honest /data/data limit row.
+ *
+ * v1.2.0: restyled to the black Honor theme only (dialog surface #201F22,
+ * blue step checks, muted body text). SAME SAF steps, SAME grant logic,
+ * SAME Files-app deep link, SAME MLBB test rows — no behavior change.
  */
 @Composable
 fun SetupWizardDialog(
@@ -75,6 +80,9 @@ fun SetupWizardDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = HonorColors.Card,
+        titleContentColor = HonorColors.OnSurface,
+        textContentColor = HonorColors.Muted,
         title = { Text("Setup — DevxyzFiles") },
         text = {
             Column(
@@ -86,7 +94,8 @@ fun SetupWizardDialog(
                 Text(
                     "Isang beses lang ito. Walang PC, walang cable, walang " +
                         "Developer Options — isang phone lang ang kailangan.",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = HonorColors.Muted
                 )
 
                 // ---- Step 1: All Files Access ----
@@ -137,7 +146,8 @@ fun SetupWizardDialog(
                         "Files > tatlong tuldok > Uninstall updates, tapos " +
                         "ulitin ang grant dito. Ang grant na nakuha mo ay hindi " +
                         "mawawala kahit mag-update ulit ang Files.",
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodySmall,
+                    color = HonorColors.Muted
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { openFilesAppSettings() }) {
@@ -161,7 +171,7 @@ fun SetupWizardDialog(
                     }
                 }
                 if (safMessage != null) {
-                    Text(safMessage!!, color = MaterialTheme.colorScheme.error)
+                    Text(safMessage!!, color = Color(0xFFEF4444))
                 }
 
                 // ---- Step 4: Live test ----
@@ -185,7 +195,8 @@ fun SetupWizardDialog(
                 if (mlbb != null) {
                     Text(
                         "Mobile Legends — first-class test",
-                        style = MaterialTheme.typography.titleSmall
+                        style = MaterialTheme.typography.titleSmall,
+                        color = HonorColors.OnSurface
                     )
                     TestRow("MLBB data", mlbb.data)
                     TestRow("MLBB obb", mlbb.obb)
@@ -193,13 +204,15 @@ fun SetupWizardDialog(
                         Icon(
                             Icons.Filled.Warning,
                             contentDescription = null,
+                            tint = HonorColors.Muted,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
                             "  /data/data/com.mobile.legends — HINDI kaya kahit via " +
                                 "SAF. Kailangan ng root doon. Android/data at " +
                                 "Android/obb lang ang kaya.",
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = HonorColors.Muted
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -215,7 +228,7 @@ fun SetupWizardDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Tapos na") }
+            TextButton(onClick = onDismiss) { Text("Tapos na", color = HonorColors.AccentBlue) }
         }
     )
 }
@@ -239,15 +252,17 @@ private fun WizardStep(
             Icon(
                 if (done) Icons.Filled.CheckCircle else Icons.Filled.Error,
                 contentDescription = null,
+                tint = if (done) HonorColors.AccentBlue else HonorColors.Muted,
                 modifier = Modifier.size(20.dp)
             )
             Text(
                 "  Step $number — $title",
-                style = MaterialTheme.typography.titleSmall
+                style = MaterialTheme.typography.titleSmall,
+                color = HonorColors.OnSurface
             )
         }
-        Text(body, style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = onAction) { Text(actionLabel) }
+        Text(body, style = MaterialTheme.typography.bodySmall, color = HonorColors.Muted)
+        OutlinedButton(onClick = onAction) { Text(actionLabel, color = HonorColors.AccentBlue) }
     }
 }
 
@@ -257,6 +272,7 @@ private fun TestRow(label: String, probe: ProbeResult) {
         Icon(
             if (probe.accessible) Icons.Filled.CheckCircle else Icons.Filled.Error,
             contentDescription = null,
+            tint = if (probe.accessible) HonorColors.AccentBlue else Color(0xFFEF4444),
             modifier = Modifier.size(18.dp)
         )
         Text(
@@ -265,7 +281,8 @@ private fun TestRow(label: String, probe: ProbeResult) {
             } else {
                 "Blocked (${probe.via})" + (probe.error?.let { " — $it" } ?: "")
             },
-            style = MaterialTheme.typography.bodySmall
+            style = MaterialTheme.typography.bodySmall,
+            color = HonorColors.OnSurface
         )
     }
 }

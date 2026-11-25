@@ -1,6 +1,7 @@
 package com.jepongdevxyz.devxyzfiles
 
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -24,6 +25,38 @@ fun formatDate(millis: Long): String {
     } catch (e: Exception) {
         "—"
     }
+}
+
+/**
+ * 2-decimal GB for the Phone card (v1.2.0): "70.94 GB Available/512 GB".
+ * Decimal GB (1 GB = 1e9 bytes), matching how phones advertise storage.
+ */
+fun formatGb2(bytes: Long): String {
+    if (bytes < 0) return "—"
+    return String.format(Locale.US, "%.2f GB", bytes / 1_000_000_000.0)
+}
+
+/**
+ * Honor Files relative date (v1.2.0) — matches the reference frames
+ * exactly: "37 min ago" / "13 min ago" inside the last hour, "3:48 PM"
+ * for earlier today, "18/10/2026" (DD/MM/YYYY) for older dates.
+ * "Just now" (< 1 min) is inferred — no frame shows it.
+ */
+fun formatDateRelative(millis: Long, nowMillis: Long = System.currentTimeMillis()): String {
+    if (millis <= 0) return "—"
+    val diff = nowMillis - millis
+    if (diff < 0) return SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(millis))
+    val minutes = diff / 60_000
+    if (minutes < 1) return "Just now"
+    if (minutes < 60) return "$minutes min ago"
+    val calNow = Calendar.getInstance().apply { timeInMillis = nowMillis }
+    val calThen = Calendar.getInstance().apply { timeInMillis = millis }
+    val sameDay = calNow.get(Calendar.YEAR) == calThen.get(Calendar.YEAR) &&
+        calNow.get(Calendar.DAY_OF_YEAR) == calThen.get(Calendar.DAY_OF_YEAR)
+    if (sameDay) {
+        return SimpleDateFormat("h:mm a", Locale.US).format(Date(millis))
+    }
+    return SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(millis))
 }
 
 /** Normalise /sdcard and /storage/self/primary to the canonical path. */

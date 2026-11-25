@@ -364,7 +364,10 @@ class SafFileAccess(private val context: Context) : FileAccess {
 
     override suspend fun copy(srcPath: String, destPath: String): Boolean =
         withContext(Dispatchers.IO) {
-            streamCopy(this, this, srcPath, destPath) { _, _ -> }
+            // NOTE: plain `this` here is the withContext CoroutineScope, not
+            // this SafFileAccess — it must be qualified or the build fails
+            // (CI Run #4: argument type mismatch at these two calls).
+            streamCopy(this@SafFileAccess, this@SafFileAccess, srcPath, destPath) { _, _ -> }
         }
 
     override suspend fun copyWithProgress(
@@ -374,7 +377,8 @@ class SafFileAccess(private val context: Context) : FileAccess {
     ): Boolean = withContext(Dispatchers.IO) {
         // Real 256 KB-chunk streaming with live copied/total — not the old
         // completion-only default. Same helper the cross-layer copy uses.
-        streamCopy(this, this, srcPath, destPath, onProgress)
+        // (Qualified `this` — see copy() above: plain `this` is the scope.)
+        streamCopy(this@SafFileAccess, this@SafFileAccess, srcPath, destPath, onProgress)
     }
 
     override suspend fun move(srcPath: String, destPath: String): Boolean =
