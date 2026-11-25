@@ -68,11 +68,17 @@ object HonorIcons {
     // errors were all these names; the `rotate` one was the missing
     // drawscope import above, not a wrong call.)
     private fun PathBuilder.addOval(oval: Rect) {
+        // Real signature, verified against Compose 1.7.2 PathBuilder
+        // source (ui-graphics-1.7.2-sources.jar): arcTo(rx, ry, theta,
+        // isMoreThanHalf, isPositiveArc, x1, y1). Two 180° halves make
+        // the full ellipse; direction is irrelevant for a filled oval.
         val cx = oval.center.x
         val cy = oval.center.y
-        moveTo(cx + oval.width / 2f, cy)
-        arcTo(oval, 0f, 180f, false)
-        arcTo(oval, 180f, 180f, false)
+        val rx = oval.width / 2f
+        val ry = oval.height / 2f
+        moveTo(cx + rx, cy)
+        arcTo(rx, ry, 0f, false, true, cx - rx, cy)
+        arcTo(rx, ry, 0f, false, true, cx + rx, cy)
         close()
     }
 
