@@ -1,4 +1,4 @@
-# DevxyzFiles — v1.0.0
+# DevxyzFiles — v1.1.0
 
 Jepong's own Android file manager for her **Android 16 phone, one phone only, no PC**.
 It can browse, copy, move, delete and rename files inside **Android/data** and
@@ -12,10 +12,11 @@ No internet permission. No analytics. Offline file manager.
 Android blocks normal apps from other apps' `Android/data` and `Android/obb`
 since Android 11 (scoped storage). **No app can grant itself shell access** —
 a fully automatic, zero-setup bypass does not exist, and anyone claiming one
-is lying. DevxyzFiles does the next best thing: a **built-in Shizuku client**
-plus a guided one-time setup that needs **only the phone itself**.
+is lying. DevxyzFiles uses the **Storage Access Framework (SAF)**: you pick
+the folders yourself in the system picker, and the grant is saved. No
+Developer Options, no PC, no root.
 
-### What v1 does
+### What v1.1 does
 
 - Home shortcuts: Internal Storage, Android/data, Android/obb, Download, DCIM, Pictures
 - **Pinned Mobile Legends card** on Home: MLBB data + MLBB obb with live
@@ -27,35 +28,35 @@ plus a guided one-time setup that needs **only the phone itself**.
 - App icons on package-named folders under Android/data and Android/obb
 - **Large-file copy with a real progress bar**: MLBB OBB and resource files
   are GBs. Copy/move streams in 256 KB chunks — never the whole file in
-  memory — and shows bytes copied / total. (Do not close the app mid-copy.)
-- Live status pill: `Shizuku • connected` / `Shizuku • hindi tumatakbo` /
-  `Direct lang`, plus live data/obb accessibility
+  memory — and shows bytes copied / total, in every direction:
+  SAF→Download, Download→SAF, and SAF grant to SAF grant. (Do not close
+  the app mid-copy.)
+- Live status pill: `SAF • data+obb granted` / `SAF • data lang` /
+  `Walang grant — buksan ang Setup`, plus live data/obb accessibility
 - Setup Wizard (first launch + Settings): 4 steps with live status checks
 
 ### Access layers (in order)
 
-1. **Shizuku (main path for Android/data and Android/obb).** The app binds
-   a UserService (`ShizukuFileService`) that runs in the Shizuku server
-   process as shell (UID 2000). Its plain `java.io.File` calls can list and
-   write the restricted folders. Copy/move run entirely inside that
-   privileged process; progress is polled from its counters.
+1. **SAF (the only path for Android/data and Android/obb).** The user
+   grants a folder in the system picker (`ACTION_OPEN_DOCUMENT_TREE` +
+   persistable grant). The grant survives reboots and app restarts.
+   A single app-folder grant (e.g. `Android/data/com.mobile.legends`)
+   works directly, even when the picker refuses the `Android/data` root.
 2. **Direct `java.io.File`** for normal storage (with All Files Access).
-3. **SAF fallback** (`ACTION_OPEN_DOCUMENT_TREE` + persistable grant) for
-   folders the user granted. On Android 16 the picker refuses Android/data
-   and Android/obb when the Files app is up to date — the wizard explains
-   the no-PC workaround (Settings > Apps > Files > Uninstall updates).
+   For restricted folders without a grant it fails honestly — the UI says
+   so instead of showing a silent empty list.
 
-### Setup — phone only, no PC (one time)
+### Setup — phone only, no PC, no Developer Options (one time)
 
 1. **All Files Access** — the wizard deep-links to the system page.
-2. **Install Shizuku** (free, Play Store, `moe.shizuku.privileged.api`).
-3. **Wireless Debugging pairing, phone-only:**
-   - Settings > About phone > tap Build number 7 times
-   - Developer options > turn ON Wireless debugging (needs Wi-Fi on)
-   - In Shizuku, tap **Pairing**
-   - In Settings, tap **Pair device with pairing code** — a 6-digit code appears
-   - Enter the code in the Shizuku notification, then tap **Start** in Shizuku
-   - Pairing is once only. After a reboot, open Shizuku and tap Start again.
+2. **Grant Android/data** in the system picker. If the picker refuses
+   the root ("Can't use this folder"), grant the **MLBB data folder
+   only** instead — that works directly. Or use the no-PC workaround:
+   Settings > Apps > Files > three-dot menu > **Uninstall updates**,
+   then grant again. A grant already given is NOT lost when the Files
+   app updates again.
+3. **Grant Android/obb** the same way (separate grant), or the MLBB
+   obb folder only.
 4. **Test** — the wizard really lists Android/data, Android/obb,
    Android/data/com.mobile.legends and Android/obb/com.mobile.legends and
    shows live counts.
@@ -63,16 +64,28 @@ plus a guided one-time setup that needs **only the phone itself**.
 ### Honest limits (also shown in the app)
 
 - **`/data/data/com.mobile.legends` is NOT accessible — not even via
-  Shizuku.** Shell (UID 2000) cannot read `/data/data` on Android 16.
+  SAF.** Nothing at app level can read `/data/data` on Android 16.
   That needs root. DevxyzFiles never claims otherwise.
-- Shizuku needs Wi-Fi on for Wireless debugging, and a manual Start tap
-  after every reboot (Android kills it).
-- SAF cannot grant Android/data or Android/obb on Android 16 while the
-  Files app is fully updated (see the workaround above).
-- Copy progress for SAF copies is coarse (no live byte counter); Direct and
-  Shizuku copies report real progress.
-- No root mode in v1. No `/data` browsing, no APK install, no archive
+- SAF is slower than shell access for multi-GB OBB copies — the bytes
+  go through the system's document provider. The progress bar is real,
+  so at least you can see it moving.
+- The picker refuses the `Android/data` and `Android/obb` roots on
+  Android 13+ while the Files app is fully updated (see the workaround
+  above). Single app-folder grants are not affected.
+- A grant can be revoked in system settings — the app re-probes on
+  every resume and says so instead of crashing.
+- No root mode. No `/data` browsing, no APK install, no archive
   handling yet.
+
+## Changelog
+
+- **v1.1.0** — SAF-only rebuild (Jepong's call: "SAF na lang"). Shizuku
+  removed entirely: no Shizuku client, no Wireless Debugging pairing,
+  no Developer Options needed. Real SAF copy progress (256 KB-chunk
+  streaming, live copied/total). Cross-layer copy: SAF↔Download and
+  SAF↔SAF stream across layers. Wizard rewritten for SAF grants incl.
+  MLBB subfolder-only grants and the Files-app Uninstall-updates help.
+- **v1.0.0** — first build. CI Run #3 green; APK delivered.
 
 ## Build (CI is the build proof)
 
@@ -101,15 +114,12 @@ android/
   gradle/wrapper/gradle-wrapper.properties   (Gradle 8.9)
   app/build.gradle.kts                      (AGP 8.7.3 — see note below)
   app/src/main/AndroidManifest.xml
-  app/src/main/aidl/.../shizuku/IDevxyzFilesService.aidl
   app/src/main/java/com/jepongdevxyz/devxyzfiles/
     MainActivity.kt       browser + home + MLBB card + copy progress
-    SetupWizard.kt        4-step wizard incl. MLBB test + SAF help
-    ShizukuManager.kt     install / binder / permission / bind state
-    FileAccess.kt         Direct + Shizuku + SAF + router + MLBB probe
+    SetupWizard.kt        4-step SAF wizard incl. MLBB test + Files help
+    FileAccess.kt         Direct + SAF + cross-layer streaming copy
     SafHelper.kt          persisted SAF grants, picker intents
-    shizuku/ShizukuFileService.kt   privileged file ops (shell UID)
-    Models.kt / Format.kt / Theme.kt / AppContext.kt
+    Models.kt / Format.kt / Theme.kt
 .github/workflows/android.yml
 README.md / SPEC.md
 ```
@@ -118,10 +128,6 @@ README.md / SPEC.md
 Android 16 (API 36). v1 uses AGP 8.7.3 — the only deliberate build change.
 Gradle 8.9, Kotlin 2.0.20 and JDK 17 are unchanged.
 
-**Shizuku versions:** client API `dev.rikka.shizuku:api:13.1.5` +
-`provider:13.1.5` — the newest artifacts on Maven Central (verified
-2026-11-25). The Shizuku server app is v13.6.0+ but still embeds API 13.1.5.
-
 ## Permissions (each justified)
 
 | Permission | Why |
@@ -129,6 +135,5 @@ Gradle 8.9, Kotlin 2.0.20 and JDK 17 are unchanged.
 | `MANAGE_EXTERNAL_STORAGE` | File manager: full shared-storage access |
 | `READ_EXTERNAL_STORAGE` (maxSdk 32) | Legacy, Android 10 and below only |
 | `WRITE_EXTERNAL_STORAGE` (maxSdk 29) | Legacy, Android 10 and below only |
-| Shizuku `ShizukuProvider` + `<queries>` for `moe.shizuku.privileged.api` | Required by the Shizuku client library |
 
-No `INTERNET`, no `REQUEST_INSTALL_PACKAGES` in v1.
+No `INTERNET`, no `REQUEST_INSTALL_PACKAGES` in v1.1.
