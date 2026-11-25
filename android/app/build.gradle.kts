@@ -12,8 +12,8 @@ android {
         applicationId = "com.jepongdevxyz.devxyzfiles"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     buildTypes {
@@ -34,10 +34,6 @@ android {
     }
     buildFeatures {
         compose = true
-        // Shizuku UserService needs AIDL codegen; BuildConfig is used for the
-        // debuggable flag on the user-service args.
-        aidl = true
-        buildConfig = true
     }
 }
 
@@ -55,13 +51,6 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-
-    // Shizuku client API — 13.1.5 is the newest artifact on Maven Central
-    // (published 2023-09-21; the Shizuku server app is at v13.6.0+ but it
-    // still embeds API 13.1.5). Verified against Maven Central, 2026-11-25.
-    val shizuku = "13.1.5"
-    implementation("dev.rikka.shizuku:api:$shizuku")
-    implementation("dev.rikka.shizuku:provider:$shizuku")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
