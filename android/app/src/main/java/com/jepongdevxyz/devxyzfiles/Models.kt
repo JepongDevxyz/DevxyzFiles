@@ -3,7 +3,6 @@ package com.jepongdevxyz.devxyzfiles
 /** How the current folder was actually opened. Shown on the status pill. */
 enum class AccessMode {
     DIRECT,
-    SHIZUKU,
     SAF,
     UNAVAILABLE
 }
@@ -49,7 +48,7 @@ data class Shortcut(
 )
 
 /**
- * MLBB probe: the two Shizuku-reachable folders plus the honest fact that
+ * MLBB probe: the two SAF-reachable folders plus the honest fact that
  * /data/data/com.mobile.legends is NOT reachable without root.
  */
 data class MlbbStatus(
@@ -57,6 +56,6 @@ data class MlbbStatus(
     val obb: ProbeResult,
     /** True when at least one of the two folders exists (MLBB installed). */
     val installed: Boolean,
-    /** Always true on a non-root phone: /data/data needs root, not Shizuku. */
+    /** Always true on a non-root phone: /data/data needs root, not SAF. */
     val privateDataBlocked: Boolean = true
 )

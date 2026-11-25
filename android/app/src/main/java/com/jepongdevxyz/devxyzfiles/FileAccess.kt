@@ -1,17 +1,15 @@
 package com.jepongdevxyz.devxyzfiles
 
 import android.content.Context
-import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
-import com.jepongdevxyz.devxyzfiles.shizuku.IDevxyzFilesService
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 
 /** One access implementation. All calls are suspend and run off the UI thread. */
 interface FileAccess {
@@ -25,19 +23,126 @@ interface FileAccess {
     suspend fun move(srcPath: String, destPath: String): Boolean
 
     /**
-     * Copy with live progress (copiedBytes, totalBytes). Default: run the
-     * plain copy and report only completion — SAF overrides stay on this.
-     * Direct and Shizuku stream in 256 KB chunks and report real progress,
-     * which matters for multi-GB MLBB OBB files.
+     * Copy with live progress (copiedBytes, totalBytes). Direct streams in
+     * 256 KB chunks and reports real progress; SAF does the same via the
+     * shared streamCopy helper — which matters for multi-GB MLBB OBB files.
      */
     suspend fun copyWithProgress(
         srcPath: String,
         destPath: String,
         onProgress: (copied: Long, total: Long) -> Unit
     ): Boolean {
-        val ok = copy(srcPath, destPath)
-        if (ok) onProgress(1L, 1L)
+        return streamCopy(this, this, srcPath, destPath, onProgress)
+    }
+
+    /** Total bytes under a path (the file itself, or the whole tree for a dir). */
+    suspend fun totalSize(path: String): Long
+
+    /** Open a file for reading, or null when it cannot be opened. */
+    suspend fun openInputStream(path: String): InputStream?
+
+    /** Create (or replace) a file for writing, or null when it cannot be created. */
+    suspend fun openOutputStream(path: String): OutputStream?
+}
+
+/**
+ * Streaming copy that works across ANY layer combination (Direct<->SAF,
+ * SAF grant A <-> SAF grant B, SAF<->Download). Streams in 256 KB chunks,
+ * never holds a whole file in memory, and reports real copied/total bytes.
+ * Directory copies recurse; an empty directory just creates the dest dir.
+ */
+private suspend fun streamCopy(
+    srcAccess: FileAccess,
+    destAccess: FileAccess,
+    srcPath: String,
+    destPath: String,
+    onProgress: (copied: Long, total: Long) -> Unit
+): Boolean {
+    val total = try {
+        srcAccess.totalSize(srcPath)
+    } catch (e: Exception) {
+        0L
+    }
+    var copied = 0L
+    onProgress(0L, total)
+    val ok = copyNode(srcAccess, destAccess, normalisePath(srcPath), normalisePath(destPath)) { bytes ->
+        copied += bytes
+        onProgress(copied.coerceAtMost(total), total)
+    }
+    if (ok) onProgress(total, total)
+    return ok
+}
+
+private suspend fun copyNode(
+    srcAccess: FileAccess,
+    destAccess: FileAccess,
+    srcPath: String,
+    destPath: String,
+    onChunk: (bytes: Long) -> Unit
+): Boolean {
+    // A directory lists; a file throws "Not a directory" — that is the
+    // isDir test, because neither layer exposes isDir() on its own.
+    val children = try {
+        srcAccess.list(srcPath)
+    } catch (e: Exception) {
+        null
+    }
+    if (children != null) {
+        val made = try {
+            destAccess.mkdir(destPath)
+        } catch (e: Exception) {
+            false
+        }
+        if (!made) {
+            // mkdir returns false when the dir already exists — only fail
+            // when the dest still cannot be listed as a directory.
+            val existsAsDir = try {
+                destAccess.list(destPath)
+                true
+            } catch (e: Exception) {
+                false
+            }
+            if (!existsAsDir) return false
+        }
+        var ok = true
+        for (child in children) {
+            if (!copyNode(srcAccess, destAccess, child.path, joinPath(destPath, child.name), onChunk)) ok = false
+        }
         return ok
+    }
+    // File: stream it in 256 KB chunks.
+    val input = try {
+        srcAccess.openInputStream(srcPath)
+    } catch (e: Exception) {
+        null
+    } ?: return false
+    val output = try {
+        destAccess.openOutputStream(destPath)
+    } catch (e: Exception) {
+        null
+    }
+    if (output == null) {
+        try {
+            input.close()
+        } catch (e: Exception) {
+            // Nothing to clean up.
+        }
+        return false
+    }
+    return try {
+        input.use { ins ->
+            output.use { outs ->
+                val buffer = ByteArray(256 * 1024)
+                var read: Int
+                while (ins.read(buffer).also { read = it } != -1) {
+                    outs.write(buffer, 0, read)
+                    onChunk(read.toLong())
+                }
+            }
+        }
+        true
+    } catch (e: Exception) {
+        false
     }
 }
 
@@ -105,6 +210,28 @@ class DirectFileAccess : FileAccess {
             else if (copy(srcPath, destPath)) delete(srcPath) else false
         }
 
+    override suspend fun totalSize(path: String): Long = withContext(Dispatchers.IO) {
+        sizeRecursive(File(normalisePath(path)))
+    }
+
+    override suspend fun openInputStream(path: String): InputStream? = withContext(Dispatchers.IO) {
+        try {
+            FileInputStream(File(normalisePath(path)))
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    override suspend fun openOutputStream(path: String): OutputStream? = withContext(Dispatchers.IO) {
+        try {
+            val file = File(normalisePath(path))
+            file.parentFile?.let { if (!it.exists()) it.mkdirs() }
+            FileOutputStream(file)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun toItem(f: File, via: AccessMode): FileItem {
         return FileItem(
             name = f.name,
@@ -170,105 +297,11 @@ class DirectFileAccess : FileAccess {
     }
 }
 
-/** Access through the Shizuku user-service (shell UID 2000). Every call is a
- *  Binder transaction to the privileged process; the file work itself runs
- *  there, so no file bytes cross the Binder. */
-class ShizukuFileAccess(private val service: IDevxyzFilesService) : FileAccess {
-    override val mode: AccessMode = AccessMode.SHIZUKU
-
-    override suspend fun list(path: String): List<FileItem> = withContext(Dispatchers.IO) {
-        val rows = service.list(normalisePath(path))
-            ?: throw IOException("Shizuku cannot list: $path")
-        rows.mapNotNull { decode(it, normalisePath(path)) }
-            .sortedWith(compareByDescending<FileItem> { it.isDir }.thenBy { it.name.lowercase() })
-    }
-
-    override suspend fun exists(path: String): Boolean = withContext(Dispatchers.IO) {
-        service.exists(normalisePath(path))
-    }
-
-    override suspend fun mkdir(path: String): Boolean = withContext(Dispatchers.IO) {
-        service.mkdirs(normalisePath(path))
-    }
-
-    override suspend fun delete(path: String): Boolean = withContext(Dispatchers.IO) {
-        service.delete(normalisePath(path))
-    }
-
-    override suspend fun rename(oldPath: String, newPath: String): Boolean =
-        withContext(Dispatchers.IO) {
-            service.rename(normalisePath(oldPath), normalisePath(newPath))
-        }
-
-    override suspend fun copy(srcPath: String, destPath: String): Boolean =
-        withContext(Dispatchers.IO) {
-            service.copy(normalisePath(srcPath), normalisePath(destPath))
-        }
-
-    override suspend fun copyWithProgress(
-        srcPath: String,
-        destPath: String,
-        onProgress: (copied: Long, total: Long) -> Unit
-    ): Boolean = withContext(Dispatchers.IO) {
-        // The copy itself runs inside the privileged process; this thread
-        // polls its progress counters so the UI gets a real progress bar
-        // for multi-GB MLBB OBB files. async is a CoroutineScope extension,
-        // so it must be called unqualified here — withContext's block runs
-        // with a CoroutineScope receiver (a fully-qualified
-        // kotlinx.coroutines.async does not exist as a top-level function).
-        val copyJob = async {
-            service.copy(normalisePath(srcPath), normalisePath(destPath))
-        }
-        var lastTotal = 0L
-        while (copyJob.isActive) {
-            try {
-                val total = service.copyTotal
-                val copied = service.copyProgress
-                if (total > 0) {
-                    lastTotal = total
-                    onProgress(copied.coerceAtMost(total), total)
-                }
-            } catch (e: Exception) {
-                // Binder hiccup while polling — the copy job still decides.
-            }
-            delay(200)
-        }
-        val ok = copyJob.await()
-        if (ok) {
-            val total = try {
-                service.copyTotal
-            } catch (e: Exception) {
-                lastTotal
-            }
-            onProgress(total, total)
-        }
-        ok
-    }
-
-    override suspend fun move(srcPath: String, destPath: String): Boolean =
-        withContext(Dispatchers.IO) {
-            service.move(normalisePath(srcPath), normalisePath(destPath))
-        }
-
-    private fun decode(row: String, parent: String): FileItem? {
-        // name|isDir|size|lastModified
-        val parts = row.split('|')
-        if (parts.size != 4) return null
-        return FileItem(
-            name = parts[0],
-            path = joinPath(parent, parts[0]),
-            isDir = parts[1].toBooleanStrictOrNull() ?: false,
-            size = parts[2].toLongOrNull() ?: 0L,
-            lastModified = parts[3].toLongOrNull() ?: 0L,
-            via = AccessMode.SHIZUKU
-        )
-    }
-}
-
 /** Storage Access Framework access for folders the user granted via the
  *  system folder picker. Works folder-by-folder only, and on Android 13+
  *  the picker refuses Android/data and Android/obb unless the Files app
- *  updates were removed (see the in-app help sheet). */
+ *  updates were removed (see the in-app help sheet). A single app-folder
+ *  grant (e.g. Android/data/com.mobile.legends) works directly. */
 class SafFileAccess(private val context: Context) : FileAccess {
     override val mode: AccessMode = AccessMode.SAF
 
@@ -304,73 +337,106 @@ class SafFileAccess(private val context: Context) : FileAccess {
     override suspend fun mkdir(path: String): Boolean = withContext(Dispatchers.IO) {
         val parent = parentOf(path) ?: return@withContext false
         val dir = rootFor(parent) ?: return@withContext false
-        dir.createDirectory(fileNameOf(path)) != null
-    }
-
-    override suspend fun delete(path: String): Boolean = withContext(Dispatchers.IO) {
-        rootFor(path)?.delete() == true
-    }
-
-    override suspend fun rename(oldPath: String, newPath: String): Boolean =
-        withContext(Dispatchers.IO) {
-            val file = rootFor(oldPath) ?: return@withContext false
-            if (parentOf(oldPath) != parentOf(newPath)) return@withContext false
-            file.renameTo(fileNameOf(newPath))
-        }
-
-    override suspend fun copy(srcPath: String, destPath: String): Boolean =
-        withContext(Dispatchers.IO) {
-            copyViaSaf(srcPath, destPath)
-        }
-
-    override suspend fun move(srcPath: String, destPath: String): Boolean =
-        withContext(Dispatchers.IO) {
-            if (copyViaSaf(srcPath, destPath)) delete(srcPath) else false
-        }
-
-    private fun copyViaSaf(srcPath: String, destPath: String): Boolean {
-        val src = rootFor(srcPath) ?: return false
-        val destParentPath = parentOf(destPath) ?: return false
-        val destParent = rootFor(destParentPath) ?: return false
-        return try {
-            if (src.isDirectory) {
-                val created = destParent.createDirectory(fileNameOf(destPath)) ?: return false
-                var ok = true
-                for (child in src.listFiles()) {
-                    if (!copyInto(child, created)) ok = false
-                }
-                ok
-            } else {
-                val mime = "application/octet-stream"
-                val out = destParent.createFile(mime, fileNameOf(destPath)) ?: return false
-                context.contentResolver.openInputStream(src.uri)?.use { input ->
-                    context.contentResolver.openOutputStream(out.uri)?.use { output ->
-                        input.copyTo(output)
-                    } ?: return false
-                } ?: return false
-                true
-            }
+        try {
+            dir.createDirectory(fileNameOf(path)) != null
         } catch (e: Exception) {
             false
         }
     }
 
-    private fun copyInto(src: DocumentFile, destDir: DocumentFile): Boolean {
+    override suspend fun delete(path: String): Boolean = withContext(Dispatchers.IO) {
+        val doc = rootFor(path) ?: return@withContext false
+        deleteRecursive(doc)
+    }
+
+    override suspend fun rename(oldPath: String, newPath: String): Boolean =
+        withContext(Dispatchers.IO) {
+            val file = rootFor(oldPath) ?: return@withContext false
+            // renameTo only works inside the same parent — a cross-parent
+            // rename must fail cleanly, never silently corrupt.
+            if (parentOf(oldPath) != parentOf(newPath)) return@withContext false
+            try {
+                file.renameTo(fileNameOf(newPath))
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+    override suspend fun copy(srcPath: String, destPath: String): Boolean =
+        withContext(Dispatchers.IO) {
+            streamCopy(this, this, srcPath, destPath) { _, _ -> }
+        }
+
+    override suspend fun copyWithProgress(
+        srcPath: String,
+        destPath: String,
+        onProgress: (copied: Long, total: Long) -> Unit
+    ): Boolean = withContext(Dispatchers.IO) {
+        // Real 256 KB-chunk streaming with live copied/total — not the old
+        // completion-only default. Same helper the cross-layer copy uses.
+        streamCopy(this, this, srcPath, destPath, onProgress)
+    }
+
+    override suspend fun move(srcPath: String, destPath: String): Boolean =
+        withContext(Dispatchers.IO) {
+            if (copy(srcPath, destPath)) delete(srcPath) else false
+        }
+
+    override suspend fun totalSize(path: String): Long = withContext(Dispatchers.IO) {
+        val doc = rootFor(path) ?: return@withContext 0L
+        sizeRecursive(doc)
+    }
+
+    override suspend fun openInputStream(path: String): InputStream? = withContext(Dispatchers.IO) {
+        try {
+            val doc = rootFor(path) ?: return@withContext null
+            if (doc.isDirectory) return@withContext null
+            context.contentResolver.openInputStream(doc.uri)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    override suspend fun openOutputStream(path: String): OutputStream? = withContext(Dispatchers.IO) {
+        try {
+            val parentPath = parentOf(path) ?: return@withContext null
+            val parent = rootFor(parentPath) ?: return@withContext null
+            val name = fileNameOf(path)
+            // createFile() on some providers makes a second file when the
+            // name already exists instead of overwriting — remove the old
+            // one first so Paste never creates "name (1)" duplicates.
+            parent.findFile(name)?.delete()
+            val created = parent.createFile("application/octet-stream", name)
+                ?: return@withContext null
+            context.contentResolver.openOutputStream(created.uri)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun sizeRecursive(doc: DocumentFile): Long {
         return try {
-            if (src.isDirectory) {
-                val created = destDir.createDirectory(src.name ?: return false) ?: return false
+            if (doc.isFile) return doc.length()
+            var total = 0L
+            for (child in doc.listFiles()) total += sizeRecursive(child)
+            total
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    private fun deleteRecursive(doc: DocumentFile): Boolean {
+        return try {
+            // DocumentFile.delete() on a directory is provider-defined:
+            // some providers delete recursively, others refuse non-empty
+            // dirs. Delete children first so this works on every provider.
+            if (doc.isDirectory) {
                 var ok = true
-                for (child in src.listFiles()) if (!copyInto(child, created)) ok = false
+                for (child in doc.listFiles()) if (!deleteRecursive(child)) ok = false
+                if (!doc.delete()) ok = false
                 ok
             } else {
-                val out = destDir.createFile("application/octet-stream", src.name ?: return false)
-                    ?: return false
-                context.contentResolver.openInputStream(src.uri)?.use { input ->
-                    context.contentResolver.openOutputStream(out.uri)?.use { output ->
-                        input.copyTo(output)
-                    } ?: return false
-                } ?: return false
-                true
+                doc.delete()
             }
         } catch (e: Exception) {
             false
@@ -395,10 +461,9 @@ class FileRepository(
 
     fun accessFor(path: String): FileAccess {
         val p = normalisePath(path)
-        if (isRestricted(p) && ShizukuManager.isReady()) {
-            val svc = ShizukuManager.service
-            if (svc != null) return ShizukuFileAccess(svc)
-        }
+        // SAF-only: a restricted path opens through a SAF grant when one
+        // covers it, otherwise Direct — which fails honestly with the
+        // probe error the UI shows.
         if (SafHelper.covers(context, p)) return SafFileAccess(context)
         return direct
     }
@@ -409,8 +474,8 @@ class FileRepository(
         return try {
             primary.list(p)
         } catch (e: Exception) {
-            // Fallback: a restricted folder that Shizuku just lost gets one
-            // SAF/Direct attempt before the UI reports it as blocked.
+            // Fallback: a SAF grant that was just revoked in system settings
+            // gets one Direct attempt before the UI reports it as blocked.
             if (primary.mode != AccessMode.DIRECT) {
                 try {
                     direct.list(p)
@@ -445,9 +510,7 @@ class FileRepository(
         accessFor(oldPath).rename(oldPath, newPath)
 
     suspend fun copy(srcPath: String, destPath: String): Boolean {
-        // Copy uses the SOURCE's access layer; the privileged process can
-        // write the destination too when both are restricted.
-        return accessFor(srcPath).copy(srcPath, destPath)
+        return copyWithProgress(srcPath, destPath) { _, _ -> }
     }
 
     suspend fun copyWithProgress(
@@ -455,15 +518,25 @@ class FileRepository(
         destPath: String,
         onProgress: (copied: Long, total: Long) -> Unit
     ): Boolean {
-        return accessFor(srcPath).copyWithProgress(srcPath, destPath, onProgress)
+        // Source and destination layers are resolved INDEPENDENTLY, so
+        // SAF<->Download and SAF-grant-A<->SAF-grant-B copies stream across
+        // layers instead of failing inside one layer.
+        val srcAccess = accessFor(srcPath)
+        val destAccess = accessFor(destPath)
+        return streamCopy(srcAccess, destAccess, srcPath, destPath, onProgress)
     }
 
     suspend fun move(srcPath: String, destPath: String): Boolean {
-        return accessFor(srcPath).move(srcPath, destPath)
+        val srcAccess = accessFor(srcPath)
+        val destAccess = accessFor(destPath)
+        // Same layer: use the layer's own move (Direct gets the fast
+        // rename path). Cross-layer: stream-copy, then delete the source.
+        if (srcAccess.mode == destAccess.mode) return srcAccess.move(srcPath, destPath)
+        return if (copyWithProgress(srcPath, destPath) { _, _ -> }) delete(srcPath) else false
     }
 
     /**
-     * MLBB first-class test: probes both Shizuku-reachable MLBB folders.
+     * MLBB first-class test: probes both SAF-reachable MLBB folders.
      * A missing folder while the parent IS listable means "not installed",
      * not "blocked" — the probe error text says which.
      */
@@ -496,8 +569,8 @@ class FileRepository(
         const val MLBB_PACKAGE = "com.mobile.legends"
         const val MLBB_DATA = "/storage/emulated/0/Android/data/com.mobile.legends"
         const val MLBB_OBB = "/storage/emulated/0/Android/obb/com.mobile.legends"
-        // HONEST LIMIT: reachable only with root. Shizuku (shell UID 2000)
-        // cannot read /data/data on Android 16. Never claim otherwise.
+        // HONEST LIMIT: reachable only with root. SAF cannot read /data/data
+        // on Android 16 — no app-level access can. Never claim otherwise.
         const val MLBB_PRIVATE_DATA = "/data/data/com.mobile.legends"
     }
 }

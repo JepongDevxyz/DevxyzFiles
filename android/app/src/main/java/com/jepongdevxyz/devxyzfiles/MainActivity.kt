@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Refresh
@@ -64,7 +63,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -110,18 +108,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        AppContext.init(applicationContext)
-        ShizukuManager.attach(applicationContext)
         setContent {
             DevxyzFilesTheme {
                 DevxyzFilesApp()
             }
         }
-    }
-
-    override fun onDestroy() {
-        ShizukuManager.detach()
-        super.onDestroy()
     }
 }
 
@@ -132,7 +123,6 @@ fun DevxyzFilesApp() {
     val scope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
     val repository = remember { FileRepository(context.applicationContext) }
-    val shizukuState by ShizukuManager.state.collectAsState()
 
     var currentPath by remember { mutableStateOf(HOME_PATH) }
     var items by remember { mutableStateOf<List<FileItem>>(emptyList()) }
@@ -174,7 +164,7 @@ fun DevxyzFilesApp() {
                 error = when {
                     repository.isRestricted(currentPath) ->
                         "Blocked: hindi mabuksan ang folder na ito. " +
-                            "Kailangan ng Shizuku (tingnan ang Setup) o SAF grant."
+                            "Kailangan ng SAF grant (tingnan ang Setup)."
                     else -> "Hindi ma-list: ${e.message}"
                 }
             } finally {
@@ -208,17 +198,11 @@ fun DevxyzFilesApp() {
         safLauncher.launch(initialTreeUri(path))
     }
 
-    // Initial + resume refresh: Shizuku can die on reboot, so re-check live.
+    // Initial + resume refresh: a SAF grant can be revoked in system
+    // settings, so re-probe live on every resume.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                ShizukuManager.refresh(context)
-                if (ShizukuManager.state.value.binderAlive &&
-                    ShizukuManager.state.value.permissionGranted &&
-                    !ShizukuManager.state.value.serviceBound
-                ) {
-                    ShizukuManager.bindService()
-                }
                 runProbes()
                 if (currentPath != HOME_PATH) loadFolder()
             }
@@ -312,11 +296,18 @@ fun DevxyzFilesApp() {
         }
     }
 
+    // Status pill — SAF grant states, read live from persisted grants.
+    // A MLBB subfolder-only grant counts too: with only that grant the
+    // MLBB folders work even though the Android/data root is ungranted.
+    val dataGranted = SafHelper.covers(context, FileRepository.RESTRICTED_DATA) ||
+        SafHelper.covers(context, FileRepository.MLBB_DATA)
+    val obbGranted = SafHelper.covers(context, FileRepository.RESTRICTED_OBB) ||
+        SafHelper.covers(context, FileRepository.MLBB_OBB)
     val statusText = when {
-        ShizukuManager.isReady() -> "Shizuku • connected"
-        shizukuState.binderAlive -> "Shizuku • hindi naka-grant"
-        shizukuState.installed -> "Shizuku • hindi tumatakbo"
-        else -> "Direct lang — walang Shizuku"
+        dataGranted && obbGranted -> "SAF • data+obb granted"
+        dataGranted -> "SAF • data lang"
+        obbGranted -> "SAF • obb lang"
+        else -> "Walang grant — buksan ang Setup"
     }
 
     Scaffold(
@@ -415,7 +406,6 @@ fun DevxyzFilesApp() {
     if (showWizard) {
         SetupWizardDialog(
             repository = repository,
-            shizukuState = shizukuState,
             restricted = restricted,
             mlbb = mlbb,
             onRunTest = { runProbes() },
@@ -582,10 +572,10 @@ private fun HomeScreen(
             onOpenObb = { onOpenPath(FileRepository.MLBB_OBB) }
         )
 
-        OutlinedButton(onClick = onOpenSetup) { Text("Buksan ang Setup / Shizuku Guide") }
+        OutlinedButton(onClick = onOpenSetup) { Text("Buksan ang Setup (SAF Guide)") }
         Text(
             "Paalala: /data/data/com.mobile.legends ay HINDI mabubuksan kahit " +
-                "via Shizuku — kailangan ng root doon. Android/data at " +
+                "via SAF — kailangan ng root doon. Android/data at " +
                 "Android/obb lang ang kaya ng DevxyzFiles.",
             style = MaterialTheme.typography.bodySmall
         )
