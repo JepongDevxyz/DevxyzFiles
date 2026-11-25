@@ -1,9 +1,13 @@
-# DevxyzFiles — v1.1.0
+# DevxyzFiles — v1.2.0
 
 Jepong's own Android file manager for her **Android 16 phone, one phone only, no PC**.
 It can browse, copy, move, delete and rename files inside **Android/data** and
 **Android/obb** — including **Mobile Legends (com.mobile.legends)** as the
-first-class test case.
+first-class test case. The UI is a frame-by-frame rebuild of **Honor's Files
+app** (her order: "Ganitong UI gawin mo, make no mistakes" — see
+`UI-SPEC-HONOR.md`): pure black background, yellow folders, blue links,
+category grid, SOURCE card, Recently deleted, selection mode with a More
+menu — every visible control wired to a real action.
 
 No internet permission. No analytics. Offline file manager.
 
@@ -16,15 +20,59 @@ is lying. DevxyzFiles uses the **Storage Access Framework (SAF)**: you pick
 the folders yourself in the system picker, and the grant is saved. No
 Developer Options, no PC, no root.
 
-### What v1.1 does
+### What v1.2 does (Honor UI — everything in v1.1, plus)
+
+- **Browse home**: "Browse" title, search pill, category grid (Images, Videos,
+  Documents, Audio, Apps, Archives — each a real view: MediaStore queries
+  with real thumbnails, extension scans, installed-apps list), SOURCE card
+  (Mobile Legends → data/obb sheet, Camera, Recorder, + user sources),
+  LOCAL STORAGE Phone card with real StatFs stats
+  ("70.94 GB Available/512 GB"), FAVOURITES section (only when non-empty),
+  LOCATION → Recently deleted
+- **Phone list**: back + "Phone" title + new-folder + sort + ⋮, search pill,
+  blue-link breadcrumbs with leading-ellipsis truncation, yellow folder rows
+  (gear badge on a folder literally named "android"), app icons on package
+  folders, relative dates + lazy async " - (N)" folder counts, thin
+  auto-fading scrollbar, sort sheet (Name / Date / Size / Type), Show hidden
+  files toggle
+- **Selection mode** (long-press): ✕ + "N item(s) selected" / "None selected",
+  radio circles, dimmed unselected names, bottom bar Share / Tags / Move /
+  Delete / More — all real (Share via FileProvider/SAF URIs, folders zip
+  first; Tags with filter; Move = cut + Paste; Delete = move to trash)
+- **More menu** (exact order): Favourite, Rename, Copy, Details, Compress
+  (real ZIP), Create desktop shortcut (real pinned shortcut), Set as source
+- **Recently deleted**: delete moves to trash (30-day prune on start),
+  Restore (recreates the parent, suffix on collision), Delete forever,
+  Empty trash
+- **Clean up**: largest files/folders on Phone, biggest first, ~5 s scan cap
+  with a partial-results note; red trash button moves to trash
+- **Setup Wizard** (first launch + Settings): same 4 SAF steps, restyled black
+- **MLBB first-class, still**: SOURCE slot + data/obb sheet, no pinned card
+  (per the Honor layout decision) — same folders, same SAF grants
+- Status pill is GONE (v1.1.0): the grant state is shown by the rows
+  themselves — a folder that opens is granted; a blocked folder says so
+- Messages (toasts) instead of inline status text; copy-progress dialog
+  restyled black
+
+### Deliberate omissions (not oversights)
+
+- **Safe (encrypted vault)** — the reference has it; a crypto vault is a
+  whole separate feature. No Safe row is shown. Later, as v1.3.0, if she asks.
+- **Honor Share / Wi-Fi Direct** — Honor system services a third-party app
+  cannot invoke. The SOURCE card shows real sources instead.
+
+### What v1.1 did
 
 - Home shortcuts: Internal Storage, Android/data, Android/obb, Download, DCIM, Pictures
 - **Pinned Mobile Legends card** on Home: MLBB data + MLBB obb with live
   counts, MLBB launcher icon when installed, and a tap to open each folder
+  (v1.2.0: the pinned card is replaced by the SOURCE slot + data/obb sheet,
+  per the Honor layout — same folders, same grants)
 - File browser: folders first, sort by name, size + date, breadcrumbs, back
   navigation, refresh, search inside the current folder
 - Long-press multi-select: copy, cut, paste, delete (confirm dialog),
   rename, new folder, file details sheet
+  (v1.2.0: delete = move to Recently deleted, never permanent from the UI)
 - App icons on package-named folders under Android/data and Android/obb
 - **Large-file copy with a real progress bar**: MLBB OBB and resource files
   are GBs. Copy/move streams in 256 KB chunks — never the whole file in
@@ -33,6 +81,7 @@ Developer Options, no PC, no root.
   the app mid-copy.)
 - Live status pill: `SAF • data+obb granted` / `SAF • data lang` /
   `Walang grant — buksan ang Setup`, plus live data/obb accessibility
+  (v1.2.0: status pill REMOVED — rows show the grant state themselves)
 - Setup Wizard (first launch + Settings): 4 steps with live status checks
 
 ### Access layers (in order)
@@ -74,17 +123,29 @@ Developer Options, no PC, no root.
   above). Single app-folder grants are not affected.
 - A grant can be revoked in system settings — the app re-probes on
   every resume and says so instead of crashing.
-- No root mode. No `/data` browsing, no APK install, no archive
-  handling yet.
+- No root mode. No `/data` browsing, no APK install. ZIP compression is in
+  (Compress in the More menu, plus folder shares zip first); ZIP extraction
+  is not in yet.
 
 ## Changelog
 
+- **v1.2.0** — Honor Files UI rebuild (her order, 2 reference videos,
+  spec `UI-SPEC-HONOR.md`): black theme, Browse home + categories + SOURCE
+  card + Recently deleted + Clean up, Honor list with breadcrumbs/lazy
+  counts/scrollbar, selection mode + More menu (Favourite, Rename, Copy,
+  Details, Compress, desktop shortcut, Set as source), Share, Tags, trash
+  with 30-day prune, FileProvider for sharing. Pinned MLBB card replaced by
+  the SOURCE slot + data/obb sheet. Status pill removed.
 - **v1.1.0** — SAF-only rebuild (Jepong's call: "SAF na lang"). Shizuku
   removed entirely: no Shizuku client, no Wireless Debugging pairing,
   no Developer Options needed. Real SAF copy progress (256 KB-chunk
   streaming, live copied/total). Cross-layer copy: SAF↔Download and
   SAF↔SAF stream across layers. Wizard rewritten for SAF grants incl.
   MLBB subfolder-only grants and the Files-app Uninstall-updates help.
+  **CI Run #4 failed on one bug**: `SafFileAccess.copy/copyWithProgress`
+  passed plain `this` (the `withContext` CoroutineScope) to `streamCopy`
+  — fixed locally as `this@SafFileAccess` (`FileAccess.kt:370,381`); the
+  fix rides with v1.2.0, CI Run #5 is its compile proof.
 - **v1.0.0** — first build. CI Run #3 green; APK delivered.
 
 ## Build (CI is the build proof)
@@ -113,15 +174,22 @@ android/
   settings.gradle.kts / build.gradle.kts / gradle.properties
   gradle/wrapper/gradle-wrapper.properties   (Gradle 8.9)
   app/build.gradle.kts                      (AGP 8.7.3 — see note below)
-  app/src/main/AndroidManifest.xml
+  app/src/main/AndroidManifest.xml          (FileProvider for Share)
+  app/src/main/res/xml/file_paths.xml       (FileProvider paths)
   app/src/main/java/com/jepongdevxyz/devxyzfiles/
-    MainActivity.kt       browser + home + MLBB card + copy progress
+    MainActivity.kt       Honor UI: Browse home wiring, list, selection,
+                          categories, Recent, trash, cleanup, share, tags
+    BrowseHome.kt         Browse home + Sources/Trash/Cleanup/MLBB sheet
+    HonorIcons.kt         code-drawn Honor icons (folder, doc types, gear)
+    HonorStores.kt        FavouriteStore / TagStore / SourceStore / TrashStore
+    ZipHelper.kt          real ZIP (Compress + folder share)
+    ShortcutHelper.kt     pinned desktop shortcuts (OPEN_PATH_EXTRA)
     SetupWizard.kt        4-step SAF wizard incl. MLBB test + Files help
     FileAccess.kt         Direct + SAF + cross-layer streaming copy
     SafHelper.kt          persisted SAF grants, picker intents
-    Models.kt / Format.kt / Theme.kt
+    Models.kt / Format.kt / Theme.kt   (Theme = Honor black, always dark)
 .github/workflows/android.yml
-README.md / SPEC.md
+README.md / SPEC.md / UI-SPEC-HONOR.md
 ```
 
 **AGP note:** the DevxyzCode template uses AGP 8.5.2, which cannot target
