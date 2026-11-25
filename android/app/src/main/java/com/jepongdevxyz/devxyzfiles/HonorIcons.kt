@@ -27,7 +27,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathBuilder
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
@@ -57,6 +59,30 @@ object HonorIcons {
     val Star: ImageVector get() = Icons.Filled.Star
 
     // ---- Custom vectors ----
+
+    // PathBuilder (the receiver inside ImageVector `path { }` blocks) has
+    // NO addOval/addRect — those live on graphics Path (Canvas), not on
+    // the vector builder. These two helpers give the builder the same
+    // shapes using only moveTo/lineTo/arcTo/close, so every call site
+    // below compiles unchanged. (CI Run #6: 19 unresolved-reference
+    // errors were all these names; the `rotate` one was the missing
+    // drawscope import above, not a wrong call.)
+    private fun PathBuilder.addOval(oval: Rect) {
+        val cx = oval.center.x
+        val cy = oval.center.y
+        moveTo(cx + oval.width / 2f, cy)
+        arcTo(oval, 0f, 180f, false)
+        arcTo(oval, 180f, 180f, false)
+        close()
+    }
+
+    private fun PathBuilder.addRect(rect: Rect) {
+        moveTo(rect.left, rect.top)
+        lineTo(rect.right, rect.top)
+        lineTo(rect.right, rect.bottom)
+        lineTo(rect.left, rect.bottom)
+        close()
+    }
 
     /** Yellow folder with tab — the list-row folder in every frame. */
     fun folderYellow(): ImageVector = folder(HonorColors.FolderYellow)
