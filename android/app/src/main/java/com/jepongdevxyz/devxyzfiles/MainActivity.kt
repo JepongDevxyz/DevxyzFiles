@@ -159,24 +159,9 @@ fun DevxyzFilesApp() {
     val appIcons = remember { mutableStateMapOf<String, ImageBitmap>() }
     var mlbbIcon by remember { mutableStateOf<ImageBitmap?>(null) }
 
-    // SAF folder-picker launcher, shared with the Setup Wizard.
-    val safLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
-        if (uri != null) {
-            SafHelper.takePermission(context, uri)
-            message = "SAF grant saved: ${SafHelper.treePath(uri) ?: uri}"
-            scope.launch {
-                restricted = repository.probeRestricted()
-                mlbb = repository.probeMlbb()
-                if (currentPath != HOME_PATH) loadFolder()
-            }
-        }
-    }
-    SafPickerLauncher.current = { path ->
-        safLauncher.launch(initialTreeUri(path))
-    }
-
+    // Declared BEFORE the SAF launcher below: Kotlin local functions must
+    // be declared before their first use, and the launcher's callback calls
+    // loadFolder() (CI Run #2: unresolved reference at the old position).
     fun loadFolder() {
         if (currentPath == HOME_PATH) return
         loading = true
@@ -203,6 +188,24 @@ fun DevxyzFilesApp() {
             restricted = repository.probeRestricted()
             mlbb = repository.probeMlbb()
         }
+    }
+
+    // SAF folder-picker launcher, shared with the Setup Wizard.
+    val safLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            SafHelper.takePermission(context, uri)
+            message = "SAF grant saved: ${SafHelper.treePath(uri) ?: uri}"
+            scope.launch {
+                restricted = repository.probeRestricted()
+                mlbb = repository.probeMlbb()
+                if (currentPath != HOME_PATH) loadFolder()
+            }
+        }
+    }
+    SafPickerLauncher.current = { path ->
+        safLauncher.launch(initialTreeUri(path))
     }
 
     // Initial + resume refresh: Shizuku can die on reboot, so re-check live.

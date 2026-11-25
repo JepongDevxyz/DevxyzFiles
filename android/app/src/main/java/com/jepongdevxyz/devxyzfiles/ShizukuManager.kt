@@ -2,6 +2,7 @@ package com.jepongdevxyz.devxyzfiles
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
@@ -43,8 +44,17 @@ object ShizukuManager {
 
     private var listenersAttached = false
 
-    private val serviceConnection = object : Shizuku.ServiceConnection {
-        override fun onConnected(binder: IBinder) {
+    // The args used for the current bind — unbindUserService in API 13.1.5
+    // needs the SAME args back: unbindUserService(args, conn, remove).
+    private var boundArgs: Shizuku.UserServiceArgs? = null
+
+    // 13.1.5 takes android.content.ServiceConnection (imported above), NOT
+    // a Shizuku.ServiceConnection — no such nested type exists. Callbacks
+    // are onServiceConnected(ComponentName, IBinder) /
+    // onServiceDisconnected(ComponentName); the old onConnected/onDisconnected
+    // overrode nothing (CI Run #2).
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             service = IDevxyzFilesService.Stub.asInterface(binder)
             val uid = try {
                 service?.uid ?: -1
@@ -54,7 +64,7 @@ object ShizukuManager {
             _state.value = _state.value.copy(serviceBound = true, serviceUid = uid, lastError = null)
         }
 
-        override fun onDisconnected() {
+        override fun onServiceDisconnected(name: ComponentName) {
             service = null
             _state.value = _state.value.copy(serviceBound = false, serviceUid = -1)
         }
@@ -98,11 +108,19 @@ object ShizukuManager {
 
     fun detach() {
         // Listeners are static and cheap; the service is unbound on destroy.
+        // 13.1.5 signature: unbindUserService(args, conn, remove) — the old
+        // 2-arg call (conn, false) matched no overload. remove=false only
+        // detaches our connection; with daemon(false) the remote service
+        // stops when the app process dies anyway.
         try {
-            Shizuku.unbindUserService(serviceConnection, false)
+            val args = boundArgs
+            if (args != null) {
+                Shizuku.unbindUserService(args, serviceConnection, false)
+            }
         } catch (e: Exception) {
             // Not bound — nothing to do.
         }
+        boundArgs = null
         service = null
     }
 
@@ -175,15 +193,20 @@ object ShizukuManager {
             val args = Shizuku.UserServiceArgs(
                 ComponentName(context.packageName, ShizukuFileService::class.java.name)
             )
-                .daemonMode(false)
+                // 13.1.5 builder method is daemon(boolean) — there is NO
+                // daemonMode() in the API. daemon(false) = the service
+                // stops when the app process dies (default is daemon=true).
+                .daemon(false)
                 .processNameSuffix("devxyzfiles")
                 .debuggable(BuildConfig.DEBUG)
                 .version(1)
-            val ok = Shizuku.bindUserService(args, serviceConnection)
-            if (!ok) {
-                _state.value = _state.value.copy(lastError = "Could not bind the Shizuku file service.")
-            }
+            boundArgs = args
+            // 13.1.5: bindUserService(UserServiceArgs, ServiceConnection)
+            // returns void, not Boolean. Success is reported async via
+            // onServiceConnected, which sets serviceBound=true.
+            Shizuku.bindUserService(args, serviceConnection)
         } catch (e: Exception) {
+            boundArgs = null
             _state.value = _state.value.copy(lastError = "Bind failed: ${e.message}")
         }
     }

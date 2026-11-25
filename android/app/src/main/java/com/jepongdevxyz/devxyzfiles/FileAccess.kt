@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import com.jepongdevxyz.devxyzfiles.shizuku.IDevxyzFilesService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
@@ -210,8 +212,11 @@ class ShizukuFileAccess(private val service: IDevxyzFilesService) : FileAccess {
     ): Boolean = withContext(Dispatchers.IO) {
         // The copy itself runs inside the privileged process; this thread
         // polls its progress counters so the UI gets a real progress bar
-        // for multi-GB MLBB OBB files.
-        val copyJob = kotlinx.coroutines.async {
+        // for multi-GB MLBB OBB files. async is a CoroutineScope extension,
+        // so it must be called unqualified here — withContext's block runs
+        // with a CoroutineScope receiver (a fully-qualified
+        // kotlinx.coroutines.async does not exist as a top-level function).
+        val copyJob = async {
             service.copy(normalisePath(srcPath), normalisePath(destPath))
         }
         var lastTotal = 0L
@@ -226,7 +231,7 @@ class ShizukuFileAccess(private val service: IDevxyzFilesService) : FileAccess {
             } catch (e: Exception) {
                 // Binder hiccup while polling — the copy job still decides.
             }
-            kotlinx.coroutines.delay(200)
+            delay(200)
         }
         val ok = copyJob.await()
         if (ok) {
