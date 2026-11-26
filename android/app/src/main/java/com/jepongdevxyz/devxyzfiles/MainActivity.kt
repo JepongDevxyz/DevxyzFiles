@@ -1205,7 +1205,7 @@ fun DevxyzFilesApp() {
                             showMoreMenu = false
                             if (isSource) {
                                 sourceStore.remove(single.path)
-                                message = "Naalis sa sources: ${single.name}"
+                                message = "Removed from sources: ${single.name}"
                             } else {
                                 sourceStore.add(single.path)
                                 message = "Na-add as source: ${single.name}"
@@ -1961,9 +1961,16 @@ private fun HonorListScreen(
                     text = "Loading... Please wait.",
                     showSpinner = true
                 )
-                items.isEmpty() -> CenteredListMessage(
-                    text = "Empty here — or the folder is blocked."
-                )
+                items.isEmpty() -> if (repository.isRestricted(currentPath)) {
+                    BlockedFolderMessage(
+                        onOpenMlbbData = { openPath(FileRepository.MLBB_DATA) },
+                        onOpenMlbbObb = { openPath(FileRepository.MLBB_OBB) }
+                    )
+                } else {
+                    CenteredListMessage(
+                        text = "Empty here — or the folder is blocked."
+                    )
+                }
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -2066,6 +2073,48 @@ private fun CenteredListMessage(text: String, showSpinner: Boolean = false) {
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 24.dp)
             )
+        }
+    }
+}
+
+/**
+ * Dead-end screen for a restricted folder (Android/data, Android/obb).
+ * Android itself blocks LISTING these folders — no app can enumerate
+ * them — but a known path below them (the MLBB folder) lists and
+ * copies fine on this phone (proven Nov 27: 45 MB into assets). So
+ * instead of a dead end, offer the jump straight into MLBB.
+ */
+@Composable
+private fun BlockedFolderMessage(
+    onOpenMlbbData: () -> Unit,
+    onOpenMlbbObb: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 24.dp)
+        ) {
+            Text(
+                "Empty here — or the folder is blocked.",
+                fontSize = 15.sp,
+                color = HonorColors.Muted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Android won't list this folder, but you can jump straight into Mobile Legends — it opens there.",
+                fontSize = 13.sp,
+                color = HonorColors.Muted,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(20.dp))
+            OutlinedButton(onClick = onOpenMlbbData, modifier = Modifier.fillMaxWidth()) {
+                Text("Open Mobile Legends data", color = HonorColors.OnSurface)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = onOpenMlbbObb, modifier = Modifier.fillMaxWidth()) {
+                Text("Open Mobile Legends obb", color = HonorColors.OnSurface)
+            }
         }
     }
 }
