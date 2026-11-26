@@ -137,6 +137,17 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.3.0** — All English + no more setup steps (her order, Nov 27):
+  the 4-step Setup Wizard is gone — the app opens straight to the main
+  Browse screen, which is where everything works (including copying
+  into the MLBB folder, proven on her phone Nov 27: 4 folders, 45 MB
+  into dragon2017/assets). Every Tagalog string in the app is now
+  English. Status-bar fit: `installSplashScreen()` put the app
+  edge-to-edge, so content drew under the status bar — onCreate now
+  restores `setDecorFitsSystemWindows(window, true)` so the UI sits
+  exactly below the status bar, never under it. The SAF grant flow is
+  gone with the wizard (the picker blocks it on this phone anyway);
+  "Add a folder as source" still uses the folder picker.
 - **v1.2.3** — Wizard layout fix (her video, Nov 27): the MLBB button
   pairs sat side by side in a Row wider than the dialog, so the second
   button was clipped off-screen — "Buksan sa Files app" was invisible
