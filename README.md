@@ -137,6 +137,15 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.3.1** — Blocked-folder jump (her screenshot, Nov 27): opening
+  Android/data itself still shows "Blocked" — Android blocks LISTING
+  that folder, no app can enumerate it — but the screen was a dead
+  end. Now a blocked restricted folder shows "Open Mobile Legends
+  data" and "Open Mobile Legends obb" buttons that jump straight to
+  the known MLBB path, where listing and copying work on her phone
+  (proven Nov 27: 45 MB into assets). The dead end is now a doorway.
+  Also fixes one Tagalog string v1.3.0 missed: the single-item
+  "Remove from sources" toast ("Naalis sa sources") is now English.
 - **v1.3.0** — All English + no more setup steps (her order, Nov 27):
   the 4-step Setup Wizard is gone — the app opens straight to the main
   Browse screen, which is where everything works (including copying
