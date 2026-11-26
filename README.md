@@ -124,8 +124,11 @@ Developer Options, no PC, no root.
   ignores the deep link and opens at the storage root, and that phone
   has no Uninstall-updates menu, so on Honor no SAF grant for
   Android/data or Android/obb is possible at all (proven on her
-  Honor 400, Nov 26, 2026). v1.2.1 tries a document-URI deep link as
-  the last SAF variant.
+  Honor 400, Nov 26, 2026 — v1.2.1's document URI also opened at
+  root). **Fallback that does work:** "Buksan sa Files app" asks the
+  system Files app itself to open AT the MLBB folder (ACTION_VIEW,
+  plain document URI — no grant, view only). Whether the Files app
+  shows the folder contents on her Honor is still untested.
 - A grant can be revoked in system settings — the app re-probes on
   every resume and says so instead of crashing.
 - No root mode. No `/data` browsing, no APK install. ZIP compression is in
@@ -134,6 +137,13 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.2.2** — "Buksan sa Files app" button (wizard Steps 2/3 + MLBB
+  source sheet): asks the system Files app itself to open AT the MLBB
+  data/obb folder (ACTION_VIEW, plain document URI — view only, NOT a
+  grant, NO bypass trick). This is the honest fallback now that SAF is
+  proven dead on her Honor (v1.2.1 document URI also opened at root).
+  Whether Honor's Files app shows the folder contents is untested —
+  her phone test decides.
 - **v1.2.1** — Last SAF attempt for Honor: the MLBB/data/obb grant now
   opens the picker with a document URI instead of a tree URI (Honor's
   picker ignores tree-URI deep links under Android/). Wizard tip fixed
