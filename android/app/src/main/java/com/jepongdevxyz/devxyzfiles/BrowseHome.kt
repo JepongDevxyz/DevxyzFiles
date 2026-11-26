@@ -583,6 +583,7 @@ fun MlbbSourceSheet(
     obbLabel: String,
     onDataClick: () -> Unit,
     onObbClick: () -> Unit,
+    onOpenInFiles: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = HonorColors.Card) {
@@ -596,6 +597,26 @@ fun MlbbSourceSheet(
             OutlinedButton(onClick = onObbClick, modifier = Modifier.fillMaxWidth()) {
                 Text(obbLabel, color = HonorColors.OnSurface)
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onOpenInFiles(FileRepository.MLBB_DATA) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Buksan data sa Files app", color = HonorColors.OnSurface)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { onOpenInFiles(FileRepository.MLBB_OBB) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Buksan obb sa Files app", color = HonorColors.OnSurface)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "Hindi ito grant — bubuksan lang ng Files app mismo yung folder para makita mo yung laman.",
+                fontSize = 12.sp,
+                color = HonorColors.Muted
+            )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 "/data/data/com.mobile.legends — hindi kaya (root lang).",

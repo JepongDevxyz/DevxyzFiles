@@ -1408,6 +1408,16 @@ fun DevxyzFilesApp() {
                 showMlbbSheet = false
                 openPath(FileRepository.MLBB_OBB)
             },
+            onOpenInFiles = { path ->
+                showMlbbSheet = false
+                if (!SafHelper.openFolderInFilesApp(this, path)) {
+                    Toast.makeText(
+                        this,
+                        "Hindi mabuksan ng Files app ang folder na ito.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            },
             onDismiss = { showMlbbSheet = false }
         )
     }

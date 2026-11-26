@@ -78,6 +78,12 @@ fun SetupWizardDialog(
         }
     }
 
+    fun openInFilesApp(path: String) {
+        if (!SafHelper.openFolderInFilesApp(context, path)) {
+            safMessage = "Hindi mabuksan ng Files app ang folder na ito."
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = HonorColors.Card,
@@ -137,6 +143,9 @@ fun SetupWizardDialog(
                     OutlinedButton(onClick = { launchSafGrant(FileRepository.MLBB_DATA) }) {
                         Text("Grant MLBB data folder only")
                     }
+                    OutlinedButton(onClick = { openInFilesApp(FileRepository.MLBB_DATA) }) {
+                        Text("Buksan sa Files app")
+                    }
                 }
                 Text(
                     "Paalala: sa ilang phone (tulad ng Honor), hindi sinusunod " +
@@ -144,7 +153,10 @@ fun SetupWizardDialog(
                         "at walang Uninstall updates sa Files app — pag ganoon, " +
                         "yung phone mismo yung humaharang, hindi yung app. " +
                         "Subukan mo pa rin yung MLBB button sa itaas; pag root " +
-                        "pa rin yung bumukas, blocked talaga siya ng phone.",
+                        "pa rin yung bumukas, blocked talaga siya ng phone. " +
+                        "Yung 'Buksan sa Files app', hindi grant — bubuksan lang " +
+                        "ng Files app mismo yung MLBB folder para makita mo yung " +
+                        "laman at makapag-copy ka doon nang mano-mano.",
                     style = MaterialTheme.typography.bodySmall,
                     color = HonorColors.Muted
                 )
@@ -167,6 +179,9 @@ fun SetupWizardDialog(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { launchSafGrant(FileRepository.MLBB_OBB) }) {
                         Text("Grant MLBB obb folder only")
+                    }
+                    OutlinedButton(onClick = { openInFilesApp(FileRepository.MLBB_OBB) }) {
+                        Text("Buksan sa Files app")
                     }
                 }
                 if (safMessage != null) {

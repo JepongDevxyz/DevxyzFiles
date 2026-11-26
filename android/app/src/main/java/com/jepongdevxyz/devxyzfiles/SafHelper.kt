@@ -11,10 +11,13 @@ import androidx.documentfile.provider.DocumentFile
  * initial-URI picker for Android/data and Android/obb.
  *
  * Honest note: on Android 13+ the system picker refuses Android/data and
- * Android/obb ("Can't use this folder") when the Files app is up to date.
- * The in-app help sheet explains the no-PC workaround — Settings > Apps >
- * Files > Uninstall updates — which restores the older picker that still
- * allows the grant. Grants already given survive a later Files update.
+ * Android/obb ("Can't use this folder"). On Honor (MagicOS, Files v16)
+ * the picker also ignores the deep link into a single app folder and
+ * there is no Uninstall-updates menu, so no SAF grant for Android/data
+ * or Android/obb is possible there at all (proven on her Honor 400,
+ * Nov 26, 2026 — tree URI and document URI both open at the storage
+ * root). The honest fallback is openFolderInFilesApp below: ask the
+ * system Files app itself to show the folder, no grant involved.
  */
 object SafHelper {
 
@@ -104,6 +107,36 @@ object SafHelper {
             Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.parse("package:com.android.documentsui")
             }
+        }
+    }
+
+    /** Ask the system Files app to open AT a folder (view only — NOT a grant).
+     *
+     * Plain ACTION_VIEW of the folder's document URI. DocumentsUI (the
+     * system Files app) opens at that location when it can. This gives
+     * DevxyzFiles NO access — the user just sees the folder in the Files
+     * app and can copy files there by hand. On phones whose picker blocks
+     * the SAF grant, this is the honest fallback: look, don't grant.
+     */
+    fun openFolderInFilesAppIntent(path: String): Intent {
+        val target = normalisePath(path)
+        val relative = target.removePrefix("/storage/emulated/0/")
+        val document = Uri.parse(
+            "content://com.android.externalstorage.documents/document/primary%3A" +
+                Uri.encode(relative)
+        )
+        return Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(document, "vnd.android.document/directory")
+        }
+    }
+
+    /** Launches the intent above; returns false when no app handles it. */
+    fun openFolderInFilesApp(context: Context, path: String): Boolean {
+        return try {
+            context.startActivity(openFolderInFilesAppIntent(path))
+            true
+        } catch (e: Exception) {
+            false
         }
     }
 }
