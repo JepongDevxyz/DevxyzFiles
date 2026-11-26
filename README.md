@@ -137,6 +137,12 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.2.3** — Wizard layout fix (her video, Nov 27): the MLBB button
+  pairs sat side by side in a Row wider than the dialog, so the second
+  button was clipped off-screen — "Buksan sa Files app" was invisible
+  even though the code was there. All three pairs (Step 2, Step 3, and
+  the MLBB test row) are now stacked vertically, full-width, so every
+  button is visible. No behavior change.
 - **v1.2.2** — "Buksan sa Files app" button (wizard Steps 2/3 + MLBB
   source sheet): asks the system Files app itself to open AT the MLBB
   data/obb folder (ACTION_VIEW, plain document URI — view only, NOT a
