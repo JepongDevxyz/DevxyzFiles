@@ -139,11 +139,17 @@ fun SetupWizardDialog(
                     actionLabel = "I-grant ang Android/data",
                     onAction = { launchSafGrant(FileRepository.RESTRICTED_DATA) }
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { launchSafGrant(FileRepository.MLBB_DATA) }) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { launchSafGrant(FileRepository.MLBB_DATA) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text("Grant MLBB data folder only")
                     }
-                    OutlinedButton(onClick = { openInFilesApp(FileRepository.MLBB_DATA) }) {
+                    OutlinedButton(
+                        onClick = { openInFilesApp(FileRepository.MLBB_DATA) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text("Buksan sa Files app")
                     }
                 }
@@ -176,11 +182,17 @@ fun SetupWizardDialog(
                     actionLabel = "I-grant ang Android/obb",
                     onAction = { launchSafGrant(FileRepository.RESTRICTED_OBB) }
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { launchSafGrant(FileRepository.MLBB_OBB) }) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { launchSafGrant(FileRepository.MLBB_OBB) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text("Grant MLBB obb folder only")
                     }
-                    OutlinedButton(onClick = { openInFilesApp(FileRepository.MLBB_OBB) }) {
+                    OutlinedButton(
+                        onClick = { openInFilesApp(FileRepository.MLBB_OBB) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text("Buksan sa Files app")
                     }
                 }
@@ -229,11 +241,17 @@ fun SetupWizardDialog(
                             color = HonorColors.Muted
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { onOpenPath(FileRepository.MLBB_DATA) }) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { onOpenPath(FileRepository.MLBB_DATA) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text("Buksan MLBB data")
                         }
-                        OutlinedButton(onClick = { onOpenPath(FileRepository.MLBB_OBB) }) {
+                        OutlinedButton(
+                            onClick = { onOpenPath(FileRepository.MLBB_OBB) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text("Buksan MLBB obb")
                         }
                     }
