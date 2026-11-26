@@ -1081,6 +1081,9 @@ fun DevxyzFilesApp() {
                     onSortClick = { showSortSheet = true },
                     onListMenuClick = { showListMenu = true },
                     onNavigateTo = ::openPath,
+                    isRestricted = repository.isRestricted(currentPath),
+                    onOpenMlbbData = { openPath(FileRepository.MLBB_DATA) },
+                    onOpenMlbbObb = { openPath(FileRepository.MLBB_OBB) },
                     onPaste = ::doPaste,
                     onShare = ::shareSelection,
                     onTags = { showTagsDialog = true },
@@ -1732,6 +1735,9 @@ private fun HonorListScreen(
     onSortClick: () -> Unit,
     onListMenuClick: () -> Unit,
     onNavigateTo: (String) -> Unit,
+    isRestricted: Boolean,
+    onOpenMlbbData: () -> Unit,
+    onOpenMlbbObb: () -> Unit,
     onPaste: () -> Unit,
     onShare: () -> Unit,
     onTags: () -> Unit,
@@ -1961,10 +1967,10 @@ private fun HonorListScreen(
                     text = "Loading... Please wait.",
                     showSpinner = true
                 )
-                items.isEmpty() -> if (repository.isRestricted(currentPath)) {
+                items.isEmpty() -> if (isRestricted) {
                     BlockedFolderMessage(
-                        onOpenMlbbData = { openPath(FileRepository.MLBB_DATA) },
-                        onOpenMlbbObb = { openPath(FileRepository.MLBB_OBB) }
+                        onOpenMlbbData = onOpenMlbbData,
+                        onOpenMlbbObb = onOpenMlbbObb
                     )
                 } else {
                     CenteredListMessage(
