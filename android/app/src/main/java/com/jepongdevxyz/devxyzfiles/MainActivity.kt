@@ -1410,9 +1410,9 @@ fun DevxyzFilesApp() {
             },
             onOpenInFiles = { path ->
                 showMlbbSheet = false
-                if (!SafHelper.openFolderInFilesApp(this, path)) {
+                if (!SafHelper.openFolderInFilesApp(context, path)) {
                     Toast.makeText(
-                        this,
+                        context,
                         "Hindi mabuksan ng Files app ang folder na ito.",
                         Toast.LENGTH_SHORT
                     ).show()
