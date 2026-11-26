@@ -1414,11 +1414,28 @@ fun DevxyzFilesApp() {
 }
 
 private fun initialTreeUri(path: String): Uri {
-    val relative = normalisePath(path).removePrefix("/storage/emulated/0/")
-    return Uri.parse(
-        "content://com.android.externalstorage.documents/tree/primary%3A" +
-            Uri.encode(relative)
-    )
+    val target = normalisePath(path)
+    val relative = target.removePrefix("/storage/emulated/0/")
+    val encoded = Uri.encode(relative)
+    val restricted = target == FileRepository.RESTRICTED_DATA ||
+        target.startsWith("${FileRepository.RESTRICTED_DATA}/") ||
+        target == FileRepository.RESTRICTED_OBB ||
+        target.startsWith("${FileRepository.RESTRICTED_OBB}/")
+    // Restricted folders (Android/data, Android/obb): Honor's DocumentsUI
+    // ignores a tree-URI deep link and opens at the storage root instead
+    // (proven on her Honor 400, v1.2.0). A document URI is the other form
+    // the picker accepts as its initial location — the last SAF attempt
+    // before concluding the phone itself blocks the grant. Normal folders
+    // keep the tree form that already works.
+    return if (restricted) {
+        Uri.parse(
+            "content://com.android.externalstorage.documents/document/primary%3A" + encoded
+        )
+    } else {
+        Uri.parse(
+            "content://com.android.externalstorage.documents/tree/primary%3A" + encoded
+        )
+    }
 }
 
 /** Real StatFs phone stats for the Browse home Phone card (§4.5). */

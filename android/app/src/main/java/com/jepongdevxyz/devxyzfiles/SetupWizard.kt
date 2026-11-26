@@ -139,13 +139,12 @@ fun SetupWizardDialog(
                     }
                 }
                 Text(
-                    "Tip: kung ayaw tanggapin ng picker ang Android/data mismo " +
-                        "(\"Can't use this folder\"), i-grant mo na lang ang " +
-                        "MLBB data folder sa itaas — gumagana yun kahit blocked " +
-                        "ang mismong Android/data. O kaya: Settings > Apps > " +
-                        "Files > tatlong tuldok > Uninstall updates, tapos " +
-                        "ulitin ang grant dito. Ang grant na nakuha mo ay hindi " +
-                        "mawawala kahit mag-update ulit ang Files.",
+                    "Paalala: sa ilang phone (tulad ng Honor), hindi sinusunod " +
+                        "ng system picker yung direktang pagbukas sa MLBB folder " +
+                        "at walang Uninstall updates sa Files app — pag ganoon, " +
+                        "yung phone mismo yung humaharang, hindi yung app. " +
+                        "Subukan mo pa rin yung MLBB button sa itaas; pag root " +
+                        "pa rin yung bumukas, blocked talaga siya ng phone.",
                     style = MaterialTheme.typography.bodySmall,
                     color = HonorColors.Muted
                 )
