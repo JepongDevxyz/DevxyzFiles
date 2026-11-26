@@ -225,7 +225,7 @@ fun BrowseHome(
                 }
                 // Honest /data/data note (kept from v1.1.0).
                 Text(
-                    "Paalala: /data/data/com.mobile.legends ay HINDI mabubuksan kahit via SAF — kailangan ng root doon. Android/data at Android/obb lang ang kaya ng DevxyzFiles.",
+                    "Note: /data/data/com.mobile.legends can't be opened even via SAF — that needs root. DevxyzFiles can only open Android/data and Android/obb.",
                     fontSize = 12.sp,
                     color = HonorColors.Muted,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
@@ -464,7 +464,7 @@ fun TrashScreen(
         HonorTopBar(title = "Recently deleted", onBack = onBack)
         if (records.isEmpty()) {
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text("Walang laman — walang naka-delete.", fontSize = 15.sp, color = HonorColors.Muted)
+                Text("Empty — nothing deleted.", fontSize = 15.sp, color = HonorColors.Muted)
             }
         } else {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.End) {
@@ -537,7 +537,7 @@ fun CleanupScreen(
             }
         } else if (largest.isEmpty()) {
             Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Text("Walang malalaking file.", fontSize = 15.sp, color = HonorColors.Muted)
+                Text("No large files.", fontSize = 15.sp, color = HonorColors.Muted)
             }
         } else {
             LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -602,24 +602,24 @@ fun MlbbSourceSheet(
                 onClick = { onOpenInFiles(FileRepository.MLBB_DATA) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Buksan data sa Files app", color = HonorColors.OnSurface)
+                Text("Open data in Files app", color = HonorColors.OnSurface)
             }
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedButton(
                 onClick = { onOpenInFiles(FileRepository.MLBB_OBB) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Buksan obb sa Files app", color = HonorColors.OnSurface)
+                Text("Open obb in Files app", color = HonorColors.OnSurface)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Hindi ito grant — bubuksan lang ng Files app mismo yung folder para makita mo yung laman.",
+                "This isn't a grant — the Files app itself just opens the folder so you can see what's inside.",
                 fontSize = 12.sp,
                 color = HonorColors.Muted
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "/data/data/com.mobile.legends — hindi kaya (root lang).",
+                "/data/data/com.mobile.legends — not possible (root only).",
                 fontSize = 12.sp,
                 color = HonorColors.Muted
             )

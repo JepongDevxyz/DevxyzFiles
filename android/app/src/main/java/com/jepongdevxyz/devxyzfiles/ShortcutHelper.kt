@@ -16,8 +16,8 @@ import androidx.core.content.getSystemService
  * or has no SAF grant).
  *
  * Returns false when the launcher does not support pinned shortcuts
- * (some OEM launchers) — the caller shows "Hindi sinusuportahan ng
- * launcher mo" instead of pretending it worked.
+ * (some OEM launchers) — the caller shows "Your launcher doesn't
+ * support this." instead of pretending it worked.
  */
 const val OPEN_PATH_EXTRA = "devxyzfiles_open_path"
 

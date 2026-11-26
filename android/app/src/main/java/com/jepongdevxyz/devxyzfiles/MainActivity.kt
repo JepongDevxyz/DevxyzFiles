@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.core.view.WindowCompat
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -104,7 +105,6 @@ private const val HOME_PATH = "home"
 
 private enum class Screen { BROWSE, RECENT, LIST, SOURCES, TRASH, CLEANUP, CATEGORY }
 private enum class SortMode { NAME, DATE, SIZE, TYPE }
-private enum class PickerMode { GRANT, ADD_SOURCE }
 
 /** Loads an installed app's launcher icon, or null when not installed. */
 fun loadAppIcon(context: Context, packageName: String): ImageBitmap? {
@@ -132,6 +132,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        // installSplashScreen() puts the app edge-to-edge, so content
+        // would draw under the status bar. Fit the system windows
+        // instead: the UI sits exactly below the status bar, never under it.
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         intent?.getStringExtra(OPEN_PATH_EXTRA)?.let { DeepLink.pendingPath = it }
         setContent {
             DevxyzFilesTheme {
@@ -176,15 +180,9 @@ fun DevxyzFilesApp() {
     var sortMode by remember { mutableStateOf(SortMode.NAME) }
     var showHidden by remember { mutableStateOf(false) }
     var tagFilter by remember { mutableStateOf<String?>(null) }
-    var restricted by remember { mutableStateOf<RestrictedStatus?>(null) }
     var mlbb by remember { mutableStateOf<MlbbStatus?>(null) }
 
     // ---- Dialog / sheet state ----
-    var showWizard by remember {
-        val seen = context.getSharedPreferences("devxyzfiles_prefs", Context.MODE_PRIVATE)
-            .getBoolean("setup_seen", false)
-        mutableStateOf(!seen)
-    }
     var showDetails by remember { mutableStateOf<FileItem?>(null) }
     var renameTarget by remember { mutableStateOf<FileItem?>(null) }
     var showNewFolder by remember { mutableStateOf(false) }
@@ -207,7 +205,6 @@ fun DevxyzFilesApp() {
     var favouritePaths by remember { mutableStateOf(favouriteStore.all()) }
     var favouriteItems by remember { mutableStateOf<List<FileItem>>(emptyList()) }
     var userSources by remember { mutableStateOf(sourceStore.all()) }
-    var pickerMode by remember { mutableStateOf(PickerMode.GRANT) }
     var pendingTempZips by remember { mutableStateOf<List<File>>(emptyList()) }
 
     // ---- Category / Recent / Cleanup state ----
@@ -238,9 +235,9 @@ fun DevxyzFilesApp() {
                 items = emptyList()
                 error = when {
                     repository.isRestricted(currentPath) ->
-                        "Blocked: hindi mabuksan ang folder na ito. " +
-                            "Kailangan ng SAF grant (tingnan ang Setup)."
-                    else -> "Hindi ma-list: ${e.message}"
+                        "Blocked: this folder can't be opened. " +
+                            "It needs a folder grant, which this phone blocks."
+                    else -> "Couldn't list: ${e.message}"
                 }
             } finally {
                 loading = false
@@ -250,7 +247,6 @@ fun DevxyzFilesApp() {
 
     fun runProbes() {
         scope.launch {
-            restricted = repository.probeRestricted()
             mlbb = repository.probeMlbb()
         }
     }
@@ -342,9 +338,9 @@ fun DevxyzFilesApp() {
             clipboard = null
             loadFolder()
             message = if (failed == 0) {
-                "Tapos: $done file(s) na-${if (clip.cut) "move" else "copy"}."
+                "Done: $done file(s) ${if (clip.cut) "moved" else "copied"}."
             } else {
-                "$done ok, $failed failed. Tingnan ang Setup kung restricted folder."
+                "$done ok, $failed failed. The folder may be restricted."
             }
         }
     }
@@ -404,7 +400,7 @@ fun DevxyzFilesApp() {
             message = if (failed == 0) {
                 "Nasa Recently deleted na: ${targetItems.size} item(s)."
             } else {
-                "$failed item(s) hindi na-move."
+                "$failed item(s) couldn't be moved."
             }
         }
     }
@@ -432,7 +428,7 @@ fun DevxyzFilesApp() {
                 trashStore.remove(record.path)
                 message = "Na-restore na: ${record.name}"
             } else {
-                message = "Hindi ma-restore."
+                message = "Couldn't restore."
             }
             refreshTrash()
         }
@@ -468,7 +464,7 @@ fun DevxyzFilesApp() {
         scope.launch {
             val uri = uriForPath(context, item.path)
             if (uri == null) {
-                message = "Hindi mabuksan ang file."
+                message = "Couldn't open the file."
                 return@launch
             }
             val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -476,9 +472,9 @@ fun DevxyzFilesApp() {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             try {
-                context.startActivity(Intent.createChooser(intent, "Buksan gamit"))
+                context.startActivity(Intent.createChooser(intent, "Open with"))
             } catch (e: Exception) {
-                message = "Walang app na makabukas nito."
+                message = "No app can open this."
             }
         }
     }
@@ -579,7 +575,7 @@ fun DevxyzFilesApp() {
             when {
                 repository.exists(data) -> openPath(data)
                 repository.exists(obb) -> openPath(obb)
-                else -> message = "Walang data folder ang app na ito."
+                else -> message = "This app has no data folder."
             }
         }
     }
@@ -647,7 +643,7 @@ fun DevxyzFilesApp() {
                 }
             }
             if (uris.isEmpty()) {
-                message = "Walang ma-share."
+                message = "Nothing to share."
                 return@launch
             }
             pendingTempZips = temps
@@ -669,7 +665,7 @@ fun DevxyzFilesApp() {
             try {
                 shareLauncher.launch(Intent.createChooser(intent, "Share"))
             } catch (e: Exception) {
-                message = "Hindi ma-share."
+                message = "Couldn't share."
                 pendingTempZips.forEach { file ->
                     try {
                         file.delete()
@@ -679,44 +675,29 @@ fun DevxyzFilesApp() {
                 }
                 pendingTempZips = emptyList()
             }
-            if (failed > 0) message = "$failed item(s) hindi na-share."
+            if (failed > 0) message = "$failed item(s) couldn't be shared."
             selection = emptySet()
             selectionMode = false
         }
     }
 
-    // SAF folder-picker launcher, shared with the Setup Wizard and the
-    // Sources screen ("Add a folder as source" — PickerMode.ADD_SOURCE).
+    // Folder-picker launcher for the Sources screen
+    // ("Add a folder as source").
     val safLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         if (uri != null) {
             SafHelper.takePermission(context, uri)
-            if (pickerMode == PickerMode.ADD_SOURCE) {
-                val path = SafHelper.treePath(uri)
-                if (path != null && sourceStore.add(path)) {
-                    refreshSources()
-                    message = "Na-add as source: ${fileNameOf(path)}"
-                } else if (path != null) {
-                    message = "Source na ito."
-                } else {
-                    message = "Hindi makuha ang path."
-                }
-                pickerMode = PickerMode.GRANT
+            val path = SafHelper.treePath(uri)
+            if (path != null && sourceStore.add(path)) {
+                refreshSources()
+                message = "Added as source: ${fileNameOf(path)}"
+            } else if (path != null) {
+                message = "Already a source."
             } else {
-                message = "SAF grant saved: ${SafHelper.treePath(uri) ?: uri}"
-                scope.launch {
-                    restricted = repository.probeRestricted()
-                    mlbb = repository.probeMlbb()
-                    if (currentPath != HOME_PATH) loadFolder()
-                }
+                message = "Couldn't get the path."
             }
-        } else {
-            pickerMode = PickerMode.GRANT
         }
-    }
-    SafPickerLauncher.current = { path ->
-        safLauncher.launch(initialTreeUri(path))
     }
 
     // Initial + resume refresh: a SAF grant can be revoked in system
@@ -842,7 +823,7 @@ fun DevxyzFilesApp() {
         if (ok) {
             openPath(path)
         } else {
-            message = "Hindi na mabuksan ang folder — baka nawala o walang grant."
+            message = "This folder can't be opened anymore — it may have moved, or the grant is gone."
         }
     }
 
@@ -974,7 +955,7 @@ fun DevxyzFilesApp() {
                 onItemClick = { item ->
                     val parent = parentOf(item.path)
                     if (parent != null) openPath(parent)
-                    else message = "Walang parent folder."
+                    else message = "No parent folder."
                 },
                 onBack = ::goHome
             )
@@ -986,13 +967,12 @@ fun DevxyzFilesApp() {
                     if (userSources.contains(item.path)) {
                         sourceStore.remove(item.path)
                         refreshSources()
-                        message = "Naalis sa sources: ${item.label}"
+                        message = "Removed from sources: ${item.label}"
                     } else {
-                        message = "Built-in source ito — hindi pwedeng alisin."
+                        message = "This is a built-in source — it can't be removed."
                     }
                 },
                 onAddSourceClick = {
-                    pickerMode = PickerMode.ADD_SOURCE
                     safLauncher.launch(initialTreeUri(FileRepository.STORAGE_ROOT))
                 },
                 onBack = ::goHome
@@ -1107,7 +1087,7 @@ fun DevxyzFilesApp() {
                     onMove = {
                         if (selection.isNotEmpty()) {
                             clipboard = Clipboard(selection.toList(), cut = true)
-                            message = "${selection.size} item(s) naka-cut — pumili ng folder tapos Paste."
+                            message = "${selection.size} item(s) cut — pick a folder, then Paste."
                             selection = emptySet()
                             selectionMode = false
                         }
@@ -1126,17 +1106,13 @@ fun DevxyzFilesApp() {
         if (showHomeMenu) {
             HonorPopupMenu(
                 items = listOf(
-                    MenuItemSpec("Setup (SAF Guide)") {
-                        showHomeMenu = false
-                        showWizard = true
-                    },
                     MenuItemSpec("Refresh") {
                         showHomeMenu = false
                         runProbes()
                         refreshTrash()
                         refreshFavourites()
                         refreshSources()
-                        message = "Na-refresh na."
+                        message = "Refreshed."
                     }
                 ),
                 onDismiss = { showHomeMenu = false }
@@ -1192,7 +1168,7 @@ fun DevxyzFilesApp() {
                     MenuItemSpec("Copy") {
                         showMoreMenu = false
                         clipboard = Clipboard(selection.toList(), cut = false)
-                        message = "${selection.size} item(s) naka-copy — pumili ng folder tapos Paste."
+                        message = "${selection.size} item(s) copied — pick a folder, then Paste."
                         selection = emptySet()
                         selectionMode = false
                     }
@@ -1218,7 +1194,7 @@ fun DevxyzFilesApp() {
                             message = if (ok) {
                                 "Shortcut request sent — i-confirm sa launcher."
                             } else {
-                                "Hindi sinusuportahan ng launcher mo."
+                                "Your launcher doesn't support this."
                             }
                             selection = emptySet()
                             selectionMode = false
@@ -1249,26 +1225,6 @@ fun DevxyzFilesApp() {
         }
     }
 
-    if (showWizard) {
-        SetupWizardDialog(
-            repository = repository,
-            restricted = restricted,
-            mlbb = mlbb,
-            onRunTest = { runProbes() },
-            onOpenPath = { path ->
-                showWizard = false
-                context.getSharedPreferences("devxyzfiles_prefs", Context.MODE_PRIVATE)
-                    .edit().putBoolean("setup_seen", true).apply()
-                openPath(path)
-            },
-            onDismiss = {
-                showWizard = false
-                context.getSharedPreferences("devxyzfiles_prefs", Context.MODE_PRIVATE)
-                    .edit().putBoolean("setup_seen", true).apply()
-            }
-        )
-    }
-
     if (copyProgress != null) {
         val (label, copied, total) = copyProgress!!
         CopyProgressDialog(label = label, copied = copied, total = total)
@@ -1280,7 +1236,7 @@ fun DevxyzFilesApp() {
             containerColor = HonorColors.Card,
             titleContentColor = HonorColors.OnSurface,
             textContentColor = HonorColors.Muted,
-            title = { Text("Nagko-compress…") },
+            title = { Text("Compressing…") },
             text = {
                 Column {
                     LinearProgressIndicator(
@@ -1289,7 +1245,7 @@ fun DevxyzFilesApp() {
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Zina-zip ang pinili mo. Huwag isara ang app.", color = HonorColors.Muted)
+                    Text("Zipping your selection. Don't close the app.", color = HonorColors.Muted)
                 }
             },
             confirmButton = {}
@@ -1306,7 +1262,7 @@ fun DevxyzFilesApp() {
             text = {
                 Text(
                     "Malilipat sa Recently deleted ang ${selection.size} item(s). " +
-                        "Maibabalik mo pa sila sa loob ng 30 araw.",
+                        "You can still restore them within 30 days.",
                     color = HonorColors.Muted
                 )
             },
@@ -1337,7 +1293,7 @@ fun DevxyzFilesApp() {
                         target.path,
                         joinPath(parentOf(target.path) ?: FileRepository.STORAGE_ROOT, newName)
                     )
-                    message = if (ok) "Na-rename na." else "Hindi na-rename."
+                    message = if (ok) "Renamed." else "Couldn't rename."
                     loadFolder()
                 }
             }
@@ -1352,7 +1308,7 @@ fun DevxyzFilesApp() {
                 showNewFolder = false
                 scope.launch {
                     val ok = repository.mkdir(joinPath(target, name))
-                    message = if (ok) "Folder na-gawa na." else "Hindi magawa ang folder."
+                    message = if (ok) "Folder created." else "Couldn't create the folder."
                     if (target == currentPath) loadFolder()
                 }
             }
@@ -1413,7 +1369,7 @@ fun DevxyzFilesApp() {
                 if (!SafHelper.openFolderInFilesApp(context, path)) {
                     Toast.makeText(
                         context,
-                        "Hindi mabuksan ng Files app ang folder na ito.",
+                        "The Files app couldn't open this folder.",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -1979,13 +1935,13 @@ private fun HonorListScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "${clipboard.paths.size} item(s) naka-${if (clipboard.cut) "cut" else "copy"}",
+                    "${clipboard.paths.size} item(s) ${if (clipboard.cut) "cut" else "copied"}",
                     fontSize = 15.sp,
                     color = HonorColors.OnSurface,
                     modifier = Modifier.weight(1f)
                 )
                 OutlinedButton(onClick = onPaste) {
-                    Text("Paste dito", color = HonorColors.AccentBlue)
+                    Text("Paste here", color = HonorColors.AccentBlue)
                 }
             }
         }
@@ -2006,7 +1962,7 @@ private fun HonorListScreen(
                     showSpinner = true
                 )
                 items.isEmpty() -> CenteredListMessage(
-                    text = "Walang laman dito — o blocked ang folder. Tingnan ang Setup."
+                    text = "Empty here — or the folder is blocked."
                 )
                 else -> LazyColumn(
                     state = listState,
@@ -2284,7 +2240,7 @@ private fun CategoryScreen(
                     showSpinner = true
                 )
                 visible.isEmpty() -> CenteredListMessage(
-                    text = if (query.isBlank()) "Walang laman." else "Walang tugma sa \"$query\"."
+                    text = if (query.isBlank()) "Empty." else "No match for \"$query\"."
                 )
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(visible, key = { it.path }) { item ->
@@ -2339,7 +2295,7 @@ private fun RecentScreen(
                     text = "Loading... Please wait.",
                     showSpinner = true
                 )
-                items.isEmpty() -> CenteredListMessage(text = "Walang recent files.")
+                items.isEmpty() -> CenteredListMessage(text = "No recent files.")
                 else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(items, key = { it.path }) { item ->
                         Column {
@@ -2532,7 +2488,7 @@ private fun TagsDialog(
                         }
                     }
                 } else {
-                    Text("Walang tag ang pinili mo.", color = HonorColors.Muted)
+                    Text("Your selection has no tags.", color = HonorColors.Muted)
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -2570,7 +2526,7 @@ private fun TagsDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Tapos na", color = HonorColors.AccentBlue)
+                Text("Done", color = HonorColors.AccentBlue)
             }
         }
     )
@@ -2695,7 +2651,7 @@ private fun CopyProgressDialog(label: String, copied: Long, total: Long) {
         containerColor = HonorColors.Card,
         titleContentColor = HonorColors.OnSurface,
         textContentColor = HonorColors.Muted,
-        title = { Text("Nagko-copy…") },
+        title = { Text("Copying…") },
         text = {
             Column {
                 Text(
@@ -2719,12 +2675,12 @@ private fun CopyProgressDialog(label: String, copied: Long, total: Long) {
                         trackColor = HonorColors.Divider,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text("Kinakalkula ang laki…", color = HonorColors.Muted)
+                    Text("Calculating size…", color = HonorColors.Muted)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "Huwag isara ang app habang nagko-copy. " +
-                        "Malalaking OBB ito (GBs) — streaming lang, hindi buo sa memory.",
+                    "Don't close the app while copying. " +
+                        "These are large OBB files (GBs) — streamed, never loaded fully into memory.",
                     style = MaterialTheme.typography.bodySmall,
                     color = HonorColors.Muted
                 )
