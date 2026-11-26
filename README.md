@@ -119,8 +119,13 @@ Developer Options, no PC, no root.
   go through the system's document provider. The progress bar is real,
   so at least you can see it moving.
 - The picker refuses the `Android/data` and `Android/obb` roots on
-  Android 13+ while the Files app is fully updated (see the workaround
-  above). Single app-folder grants are not affected.
+  Android 13+. Single app-folder grants work on Pixel/Samsung via a
+  deep link — but Honor's picker (MagicOS, Android 15, Files v16)
+  ignores the deep link and opens at the storage root, and that phone
+  has no Uninstall-updates menu, so on Honor no SAF grant for
+  Android/data or Android/obb is possible at all (proven on her
+  Honor 400, Nov 26, 2026). v1.2.1 tries a document-URI deep link as
+  the last SAF variant.
 - A grant can be revoked in system settings — the app re-probes on
   every resume and says so instead of crashing.
 - No root mode. No `/data` browsing, no APK install. ZIP compression is in
@@ -129,6 +134,13 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.2.1** — Last SAF attempt for Honor: the MLBB/data/obb grant now
+  opens the picker with a document URI instead of a tree URI (Honor's
+  picker ignores tree-URI deep links under Android/). Wizard tip fixed
+  — it no longer claims the MLBB grant works on Honor, and the Files
+  Uninstall-updates workaround is gone from the tip (no such menu on
+  her phone). No Developer Options needed; if this fails, the phone
+  itself blocks SAF grants for Android/data+obb.
 - **v1.2.0** — Honor Files UI rebuild (her order, 2 reference videos,
   spec `UI-SPEC-HONOR.md`): black theme, Browse home + categories + SOURCE
   card + Recently deleted + Clean up, Honor list with breadcrumbs/lazy
