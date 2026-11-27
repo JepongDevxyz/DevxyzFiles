@@ -137,6 +137,17 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.3.6** — Paste to MLBB, via the Files app (her test, Nov 27): the
+  v1.3.5 toast proved file access is ON and the phone still blocks the
+  direct write into MLBB — but she proved the system Files app CAN
+  paste into MLBB Assets. So "Paste to MLBB" now falls back on its
+  own: if the direct copy fails completely into a restricted folder,
+  the app stages the files in `DevxyzFiles/MLBB` (plain shared
+  storage, which the app CAN write) and opens a dialog — "Copy in the
+  Files app" — whose button opens the Files app at the staging
+  folder, so she copies there and pastes into MLBB Assets. Cut moves
+  the originals into staging (same move semantics); copy leaves them
+  in place. The staged copies can be deleted after pasting.
 - **v1.3.5** — Paste tells the real reason (her video, Nov 27): she
   tapped "Paste to MLBB" on v1.3.4, the copy started — and wrote
   0 bytes: "0 ok, 4 failed. The folder may be restricted." That
