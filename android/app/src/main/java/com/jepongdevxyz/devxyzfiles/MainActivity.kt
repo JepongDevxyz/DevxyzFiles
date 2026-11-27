@@ -204,6 +204,7 @@ fun DevxyzFilesApp() {
     var showTagsDialog by remember { mutableStateOf(false) }
     var showMlbbSheet by remember { mutableStateOf(false) }
     var showFilesAccessDialog by remember { mutableStateOf(!Environment.isExternalStorageManager()) }
+    var showMlbbStageDialog by remember { mutableStateOf(false) }
     var filesAccessDismissed by remember { mutableStateOf(false) }
 
     // ---- Stores / derived state ----
@@ -359,14 +360,49 @@ fun DevxyzFilesApp() {
             // failure at all. Say what actually happened.
             val where = if (destDir == FileRepository.MLBB_ASSETS) " to MLBB Assets" else ""
             val verb = if (clip.cut) "moved" else "copied"
-            message = when {
-                failed == 0 && skipped == 0 ->
-                    "Done: $done file(s) $verb$where."
-                failed == 0 ->
-                    "Done: $done file(s) $verb$where. $skipped already in this folder."
-                else ->
-                    "$done ok, $failed failed. File access is on, but the write into " +
-                        "${if (destDir == FileRepository.MLBB_ASSETS) "MLBB Assets" else "this folder"} was blocked — check it in the Files app."
+            if (done == 0 && failed > 0 && repository.isRestricted(destDir)) {
+                // The phone blocks direct writes into MLBB even with file
+                // access on (proven on her Honor, Nov 27) — but the
+                // system Files app CAN write there (proven the same day).
+                // So stage the files where the Files app can see them and
+                // let her finish the paste there.
+                var staged = 0
+                var stageFailed = 0
+                for (src in clip.paths) {
+                    val stageDest = joinPath(FileRepository.MLBB_STAGING, fileNameOf(src))
+                    if (normalisePath(src) == normalisePath(stageDest)) {
+                        staged++
+                        continue
+                    }
+                    val ok = if (clip.cut) {
+                        repository.move(src, stageDest)
+                    } else {
+                        copyProgress = Triple(fileNameOf(src), 0L, 0L)
+                        val result = repository.copyWithProgress(src, stageDest) { copied, total ->
+                            scope.launch { copyProgress = Triple(fileNameOf(src), copied, total) }
+                        }
+                        copyProgress = null
+                        result
+                    }
+                    if (ok) staged++ else stageFailed++
+                }
+                loadFolder()
+                if (staged > 0) {
+                    showMlbbStageDialog = true
+                    message = "Direct copy blocked — $staged file(s) staged for the Files app."
+                } else {
+                    message = "The direct copy was blocked, and staging the files failed too."
+                }
+            } else {
+                message = when {
+                    failed == 0 && skipped == 0 ->
+                        "Done: $done file(s) $verb$where."
+                    failed == 0 ->
+                        "Done: $done file(s) $verb$where. $skipped already in this folder."
+                    else ->
+                        "$done ok, $failed failed. File access is on, but the write into " +
+                            "${if (destDir == FileRepository.MLBB_ASSETS) "MLBB Assets" else "this folder"} was blocked — check it in the Files app."
+                }
             }
         }
     }
@@ -1458,6 +1494,44 @@ fun DevxyzFilesApp() {
                         showFilesAccessDialog = false
                         filesAccessDismissed = true
                     }
+                ) { Text("Later", color = HonorColors.AccentBlue) }
+            }
+        )
+    }
+
+    if (showMlbbStageDialog) {
+        AlertDialog(
+            onDismissRequest = { showMlbbStageDialog = false },
+            containerColor = HonorColors.Card,
+            titleContentColor = HonorColors.OnSurface,
+            textContentColor = HonorColors.Muted,
+            title = { Text("Copy in the Files app") },
+            text = {
+                Text(
+                    "The phone blocked the direct copy into MLBB. " +
+                        "Your files are ready in the DevxyzFiles/MLBB folder. " +
+                        "Copy them in the Files app, then paste them into MLBB Assets. " +
+                        "You can delete the staged copies after.",
+                    color = HonorColors.Muted
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showMlbbStageDialog = false
+                        if (!SafHelper.openFolderInFilesApp(context, FileRepository.MLBB_STAGING)) {
+                            Toast.makeText(
+                                context,
+                                "The Files app couldn't open this folder.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                ) { Text("Open Files app", color = HonorColors.AccentBlue) }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showMlbbStageDialog = false }
                 ) { Text("Later", color = HonorColors.AccentBlue) }
             }
         )

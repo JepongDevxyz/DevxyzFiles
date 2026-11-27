@@ -574,6 +574,13 @@ class FileRepository(
         const val MLBB_DATA = "/storage/emulated/0/Android/data/com.mobile.legends"
         const val MLBB_OBB = "/storage/emulated/0/Android/obb/com.mobile.legends"
         const val MLBB_ASSETS = "/storage/emulated/0/Android/data/com.mobile.legends/files/dragon2017/assets"
+        // Staging folder for the MLBB fallback: the phone blocks direct
+        // writes into Android/data even with file access on (proven on
+        // her Honor, Nov 27) — but the system Files app CAN write there
+        // (proven the same day). So "Paste to MLBB" stages the files
+        // here, in plain shared storage, and she finishes the paste in
+        // the Files app.
+        const val MLBB_STAGING = "/storage/emulated/0/DevxyzFiles/MLBB"
         // HONEST LIMIT: reachable only with root. SAF cannot read /data/data
         // on Android 16 — no app-level access can. Never claim otherwise.
         const val MLBB_PRIVATE_DATA = "/data/data/com.mobile.legends"
