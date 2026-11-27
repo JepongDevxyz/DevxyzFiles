@@ -10,8 +10,10 @@ import android.graphics.Canvas
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.StatFs
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Size
 import android.webkit.MimeTypeMap
 import android.widget.Toast
@@ -201,6 +203,8 @@ fun DevxyzFilesApp() {
     var showMoreMenu by remember { mutableStateOf(false) }
     var showTagsDialog by remember { mutableStateOf(false) }
     var showMlbbSheet by remember { mutableStateOf(false) }
+    var showFilesAccessDialog by remember { mutableStateOf(!Environment.isExternalStorageManager()) }
+    var filesAccessDismissed by remember { mutableStateOf(false) }
 
     // ---- Stores / derived state ----
     val appIcons = remember { mutableStateMapOf<String, ImageBitmap>() }
@@ -312,9 +316,8 @@ fun DevxyzFilesApp() {
         }
     }
 
-    fun doPaste() {
+    fun doPaste(destDir: String = currentPath) {
         val clip = clipboard ?: return
-        val destDir = currentPath
         if (destDir == HOME_PATH) {
             message = "Pick a folder to paste into first."
             return
@@ -343,7 +346,8 @@ fun DevxyzFilesApp() {
             clipboard = null
             loadFolder()
             message = if (failed == 0) {
-                "Done: $done file(s) ${if (clip.cut) "moved" else "copied"}."
+                "Done: $done file(s) ${if (clip.cut) "moved" else "copied"}" +
+                    "${if (destDir == FileRepository.MLBB_ASSETS) " to MLBB Assets" else ""}."
             } else {
                 "$done ok, $failed failed. The folder may be restricted."
             }
@@ -715,6 +719,13 @@ fun DevxyzFilesApp() {
                 refreshFavourites()
                 refreshSources()
                 if (currentPath != HOME_PATH) loadFolder()
+                // All Files Access can be granted/revoked in system settings:
+                // re-check on every resume so the prompt follows reality.
+                if (Environment.isExternalStorageManager()) {
+                    showFilesAccessDialog = false
+                } else if (!filesAccessDismissed) {
+                    showFilesAccessDialog = true
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -1098,7 +1109,8 @@ fun DevxyzFilesApp() {
                             ).show()
                         }
                     },
-                    onPaste = ::doPaste,
+                    onPaste = { doPaste() },
+                    onPasteToMlbb = { doPaste(FileRepository.MLBB_ASSETS) },
                     onShare = ::shareSelection,
                     onTags = { showTagsDialog = true },
                     onMove = {
@@ -1392,6 +1404,45 @@ fun DevxyzFilesApp() {
                 }
             },
             onDismiss = { showMlbbSheet = false }
+        )
+    }
+
+    if (showFilesAccessDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showFilesAccessDialog = false
+                filesAccessDismissed = true
+            },
+            containerColor = HonorColors.Card,
+            titleContentColor = HonorColors.OnSurface,
+            textContentColor = HonorColors.Muted,
+            title = { Text("Allow file access") },
+            text = {
+                Text(
+                    "DevxyzFiles needs All Files Access to find your files and copy them — including into Mobile Legends. Without it, folders look empty.",
+                    color = HonorColors.Muted
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showFilesAccessDialog = false
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    }
+                ) { Text("Allow", color = HonorColors.AccentBlue) }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showFilesAccessDialog = false
+                        filesAccessDismissed = true
+                    }
+                ) { Text("Later", color = HonorColors.AccentBlue) }
+            }
         )
     }
 }
@@ -1754,6 +1805,7 @@ private fun HonorListScreen(
     onOpenMlbbObb: () -> Unit,
     onOpenInFiles: () -> Unit,
     onPaste: () -> Unit,
+    onPasteToMlbb: () -> Unit,
     onShare: () -> Unit,
     onTags: () -> Unit,
     onMove: () -> Unit,
@@ -1963,6 +2015,10 @@ private fun HonorListScreen(
                 )
                 OutlinedButton(onClick = onPaste) {
                     Text("Paste here", color = HonorColors.AccentBlue)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                OutlinedButton(onClick = onPasteToMlbb) {
+                    Text("Paste to MLBB", color = HonorColors.AccentBlue)
                 }
             }
         }

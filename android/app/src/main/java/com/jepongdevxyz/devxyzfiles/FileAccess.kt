@@ -573,6 +573,7 @@ class FileRepository(
         const val MLBB_PACKAGE = "com.mobile.legends"
         const val MLBB_DATA = "/storage/emulated/0/Android/data/com.mobile.legends"
         const val MLBB_OBB = "/storage/emulated/0/Android/obb/com.mobile.legends"
+        const val MLBB_ASSETS = "/storage/emulated/0/Android/data/com.mobile.legends/files/dragon2017/assets"
         // HONEST LIMIT: reachable only with root. SAF cannot read /data/data
         // on Android 16 — no app-level access can. Never claim otherwise.
         const val MLBB_PRIVATE_DATA = "/data/data/com.mobile.legends"
