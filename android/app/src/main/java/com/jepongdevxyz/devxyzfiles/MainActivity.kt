@@ -322,13 +322,22 @@ fun DevxyzFilesApp() {
             message = "Pick a folder to paste into first."
             return
         }
+        // A copy can only write when All Files Access is on. Check it
+        // BEFORE the copy runs — and open the prompt — instead of
+        // failing every item with a generic "restricted" message.
+        if (!Environment.isExternalStorageManager()) {
+            showFilesAccessDialog = true
+            message = "All Files Access is off — allow it first, then paste again."
+            return
+        }
         scope.launch {
             var done = 0
             var failed = 0
+            var skipped = 0
             for (src in clip.paths) {
                 val dest = joinPath(destDir, fileNameOf(src))
                 if (normalisePath(src) == normalisePath(dest)) {
-                    failed++
+                    skipped++
                     continue
                 }
                 val ok = if (clip.cut) {
@@ -345,11 +354,19 @@ fun DevxyzFilesApp() {
             }
             clipboard = null
             loadFolder()
-            message = if (failed == 0) {
-                "Done: $done file(s) ${if (clip.cut) "moved" else "copied"}" +
-                    "${if (destDir == FileRepository.MLBB_ASSETS) " to MLBB Assets" else ""}."
-            } else {
-                "$done ok, $failed failed. The folder may be restricted."
+            // The old message blamed "restriction" for everything —
+            // including pasting into the same folder, which is not a
+            // failure at all. Say what actually happened.
+            val where = if (destDir == FileRepository.MLBB_ASSETS) " to MLBB Assets" else ""
+            val verb = if (clip.cut) "moved" else "copied"
+            message = when {
+                failed == 0 && skipped == 0 ->
+                    "Done: $done file(s) $verb$where."
+                failed == 0 ->
+                    "Done: $done file(s) $verb$where. $skipped already in this folder."
+                else ->
+                    "$done ok, $failed failed. File access is on, but the write into " +
+                        "${if (destDir == FileRepository.MLBB_ASSETS) "MLBB Assets" else "this folder"} was blocked — check it in the Files app."
             }
         }
     }
