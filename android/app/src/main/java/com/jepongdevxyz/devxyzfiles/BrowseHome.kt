@@ -81,7 +81,6 @@ fun BrowseHome(
     selectedTab: HomeTab,
     onTabClick: (HomeTab) -> Unit,
     onSearchClick: () -> Unit,
-    onCategoryClick: (Category) -> Unit,
     onSourceClick: (SourceItem) -> Unit,
     onAllSourcesClick: () -> Unit,
     onPhoneClick: () -> Unit,
@@ -133,8 +132,6 @@ fun BrowseHome(
                         Text("Search", fontSize = 16.sp, color = HonorColors.Muted)
                     }
                 }
-                // 3-col category grid.
-                CategoryGrid(onCategoryClick = onCategoryClick)
                 // SOURCE.
                 SectionHeader(label = "SOURCE", actionLabel = "All ›", onActionClick = onAllSourcesClick)
                 SourcesCard(sources = sources, onSourceClick = onSourceClick)
@@ -250,46 +247,6 @@ private fun SectionHeader(label: String, actionLabel: String?, actionBlue: Boole
                     fontSize = 15.sp,
                     color = if (actionBlue) HonorColors.AccentBlue else HonorColors.OnSurface
                 )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryGrid(onCategoryClick: (Category) -> Unit) {
-    val cats = listOf(
-        Triple(Category.IMAGES, "Images", HonorIcons.DocType.IMAGE),
-        Triple(Category.VIDEOS, "Videos", HonorIcons.DocType.VIDEO),
-        Triple(Category.DOCUMENTS, "Documents", HonorIcons.DocType.DOCUMENT),
-        Triple(Category.AUDIO, "Audio", HonorIcons.DocType.AUDIO),
-        Triple(Category.APPS, "Apps", HonorIcons.DocType.APP),
-        Triple(Category.ARCHIVES, "Archives", HonorIcons.DocType.ARCHIVE)
-    )
-    Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        cats.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (cat, label, type) ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(96.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(HonorColors.Card)
-                            .clickable { onCategoryClick(cat) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = HonorIcons.docIcon(type),
-                                contentDescription = null,
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(56.dp)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(label, fontSize = 15.sp, color = HonorColors.OnSurface)
-                        }
-                    }
-                }
             }
         }
     }

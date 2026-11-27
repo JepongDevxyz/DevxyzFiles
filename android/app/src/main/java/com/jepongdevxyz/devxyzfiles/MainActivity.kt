@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -133,8 +134,12 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         // installSplashScreen() puts the app edge-to-edge, so content
-        // would draw under the status bar. Fit the system windows
-        // instead: the UI sits exactly below the status bar, never under it.
+        // would draw under the status bar. setDecorFitsSystemWindows
+        // alone does NOT fix it: Android 15 enforces edge-to-edge for
+        // targetSdk 35+ and ignores that flag — the v1.3.0 fix proved
+        // it on her phone (title still crowded the status bar). The
+        // real fix is Compose-level: statusBarsPadding() on the root
+        // Box pads every screen below the status bar, on any API level.
         WindowCompat.setDecorFitsSystemWindows(window, true)
         intent?.getStringExtra(OPEN_PATH_EXTRA)?.let { DeepLink.pendingPath = it }
         setContent {
@@ -914,6 +919,7 @@ fun DevxyzFilesApp() {
         modifier = Modifier
             .fillMaxSize()
             .background(HonorColors.Background)
+            .statusBarsPadding()
     ) {
         when (screen) {
             Screen.BROWSE -> BrowseHome(
@@ -928,7 +934,6 @@ fun DevxyzFilesApp() {
                     openPath(FileRepository.STORAGE_ROOT)
                     searchFocusNonce++
                 },
-                onCategoryClick = ::openCategory,
                 onSourceClick = ::openSource,
                 onAllSourcesClick = { screen = Screen.SOURCES },
                 onPhoneClick = {
