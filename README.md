@@ -137,6 +137,23 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.3.3** — Blocked screen, honest fix (her screenshot, Nov 27):
+  the v1.3.1 MLBB jump buttons were a dead end — tapping "Open Mobile
+  Legends data" from the blocked Android/data screen just landed on
+  the same blocked screen one level deeper, because the MLBB folder
+  itself can't be listed in-app either (the Step 4 probe was right;
+  the Nov 27 copy video proved only WRITES into MLBB, never listing).
+  The blocked screen now leads with an **"Open in Files app"**
+  button, which opens the system Files app directly at that folder
+  (phone-proven Nov 27 — it shows the full MLBB contents). The two
+  jump buttons stay, but each one hides when you're already in (or
+  inside) that MLBB folder, since it would only reload the same
+  blocked screen. Copy and move need no code change: the "Paste here"
+  bar already shows on the blocked screen, `doPaste` already handles
+  cut (move) and copy into any current folder, and copy into MLBB is
+  phone-proven — move into MLBB is the same write path but unproven
+  on her phone, so it's on the v1.3.3 test list. Also fixed one more
+  Tagalog string the sweeps missed ("Pumili muna ng folder...").
 - **v1.3.2** — Category grid removed + real status-bar fix (her order,
   Nov 27): the 6 category tiles (Images, Videos, Documents, Audio,
   Apps, Archives) are gone from the Browse home — SOURCE, LOCAL
