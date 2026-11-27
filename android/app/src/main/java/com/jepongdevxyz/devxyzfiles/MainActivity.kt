@@ -316,7 +316,7 @@ fun DevxyzFilesApp() {
         val clip = clipboard ?: return
         val destDir = currentPath
         if (destDir == HOME_PATH) {
-            message = "Pumili muna ng folder na paglalagyan."
+            message = "Pick a folder to paste into first."
             return
         }
         scope.launch {
@@ -1089,6 +1089,15 @@ fun DevxyzFilesApp() {
                     isRestricted = repository.isRestricted(currentPath),
                     onOpenMlbbData = { openPath(FileRepository.MLBB_DATA) },
                     onOpenMlbbObb = { openPath(FileRepository.MLBB_OBB) },
+                    onOpenInFiles = {
+                        if (!SafHelper.openFolderInFilesApp(context, currentPath)) {
+                            Toast.makeText(
+                                context,
+                                "The Files app couldn't open this folder.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
                     onPaste = ::doPaste,
                     onShare = ::shareSelection,
                     onTags = { showTagsDialog = true },
@@ -1266,10 +1275,10 @@ fun DevxyzFilesApp() {
             containerColor = HonorColors.Card,
             titleContentColor = HonorColors.OnSurface,
             textContentColor = HonorColors.Muted,
-            title = { Text("I-delete?") },
+            title = { Text("Delete?") },
             text = {
                 Text(
-                    "Malilipat sa Recently deleted ang ${selection.size} item(s). " +
+                    "The ${selection.size} item(s) will be moved to Recently deleted. " +
                         "You can still restore them within 30 days.",
                     color = HonorColors.Muted
                 )
@@ -1743,6 +1752,7 @@ private fun HonorListScreen(
     isRestricted: Boolean,
     onOpenMlbbData: () -> Unit,
     onOpenMlbbObb: () -> Unit,
+    onOpenInFiles: () -> Unit,
     onPaste: () -> Unit,
     onShare: () -> Unit,
     onTags: () -> Unit,
@@ -1975,7 +1985,14 @@ private fun HonorListScreen(
                 items.isEmpty() -> if (isRestricted) {
                     BlockedFolderMessage(
                         onOpenMlbbData = onOpenMlbbData,
-                        onOpenMlbbObb = onOpenMlbbObb
+                        onOpenMlbbObb = onOpenMlbbObb,
+                        onOpenInFiles = onOpenInFiles,
+                        // A jump to the folder we're already in (or inside of)
+                        // just reloads this same blocked screen — hide it.
+                        showMlbbData = currentPath != FileRepository.MLBB_DATA &&
+                            !currentPath.startsWith(FileRepository.MLBB_DATA + "/"),
+                        showMlbbObb = currentPath != FileRepository.MLBB_OBB &&
+                            !currentPath.startsWith(FileRepository.MLBB_OBB + "/")
                     )
                 } else {
                     CenteredListMessage(
@@ -2098,7 +2115,10 @@ private fun CenteredListMessage(text: String, showSpinner: Boolean = false) {
 @Composable
 private fun BlockedFolderMessage(
     onOpenMlbbData: () -> Unit,
-    onOpenMlbbObb: () -> Unit
+    onOpenMlbbObb: () -> Unit,
+    onOpenInFiles: () -> Unit,
+    showMlbbData: Boolean = true,
+    showMlbbObb: Boolean = true
 ) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
@@ -2113,18 +2133,26 @@ private fun BlockedFolderMessage(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                "Android won't list this folder, but you can jump straight into Mobile Legends — it opens there.",
+                "Android won't list this folder, but the Files app can open it and show everything inside.",
                 fontSize = 13.sp,
                 color = HonorColors.Muted,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
             Spacer(modifier = Modifier.height(20.dp))
-            OutlinedButton(onClick = onOpenMlbbData, modifier = Modifier.fillMaxWidth()) {
-                Text("Open Mobile Legends data", color = HonorColors.OnSurface)
+            OutlinedButton(onClick = onOpenInFiles, modifier = Modifier.fillMaxWidth()) {
+                Text("Open in Files app", color = HonorColors.OnSurface)
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(onClick = onOpenMlbbObb, modifier = Modifier.fillMaxWidth()) {
-                Text("Open Mobile Legends obb", color = HonorColors.OnSurface)
+            if (showMlbbData) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(onClick = onOpenMlbbData, modifier = Modifier.fillMaxWidth()) {
+                    Text("Open Mobile Legends data", color = HonorColors.OnSurface)
+                }
+            }
+            if (showMlbbObb) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(onClick = onOpenMlbbObb, modifier = Modifier.fillMaxWidth()) {
+                    Text("Open Mobile Legends obb", color = HonorColors.OnSurface)
+                }
             }
         }
     }
