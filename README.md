@@ -137,6 +137,17 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.3.2** — Category grid removed + real status-bar fix (her order,
+  Nov 27): the 6 category tiles (Images, Videos, Documents, Audio,
+  Apps, Archives) are gone from the Browse home — SOURCE, LOCAL
+  STORAGE and the bottom nav stay. Status bar, second attempt: the
+  v1.3.0 `setDecorFitsSystemWindows(true)` did NOT work on her phone
+  because Android 15 enforces edge-to-edge for targetSdk 35+ and
+  ignores that flag (her screenshot proved it — the title still
+  crowded the status bar). The real fix is Compose-level:
+  `statusBarsPadding()` on the root Box pads every screen below the
+  status bar on any API level. The flag call stays as a harmless
+  fallback for older Android.
 - **v1.3.1** — Blocked-folder jump (her screenshot, Nov 27): opening
   Android/data itself still shows "Blocked" — Android blocks LISTING
   that folder, no app can enumerate it — but the screen was a dead
