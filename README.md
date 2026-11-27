@@ -137,6 +137,19 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.3.5** — Paste tells the real reason (her video, Nov 27): she
+  tapped "Paste to MLBB" on v1.3.4, the copy started — and wrote
+  0 bytes: "0 ok, 4 failed. The folder may be restricted." That
+  message was the problem: it blamed "restriction" for everything,
+  including pasting into the same folder (not a failure at all), and
+  hid the real cause. Now `doPaste` checks All Files Access BEFORE
+  the copy runs — if it is off, the "Allow file access" dialog opens
+  and the toast says so plainly ("allow it first, then paste again").
+  Same-folder items are counted separately ("already in this folder"),
+  and a real write failure says the write itself was blocked even
+  with file access on, so the next test tells us which of the two it
+  is. (Video evidence: the source folders list fine, so the app can
+  read — the write into MLBB Assets is what failed at 0 bytes.)
 - **v1.3.4** — Allow files + Paste to MLBB (her order, Nov 27):
   the app declared All Files Access in the manifest but NEVER asked
   for it — the wizard that used to do that is gone since v1.3.0, so
