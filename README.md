@@ -137,6 +137,22 @@ Developer Options, no PC, no root.
 
 ## Changelog
 
+- **v1.3.4** — Allow files + Paste to MLBB (her order, Nov 27):
+  the app declared All Files Access in the manifest but NEVER asked
+  for it — the wizard that used to do that is gone since v1.3.0, so
+  on a fresh install (or a revoked grant) the app silently saw no
+  files at all. Now it asks on launch and on every resume until the
+  grant is on: an "Allow file access" dialog explains why, and
+  "Allow" opens the system All Files Access page for the app ("Later"
+  dismisses it for the session). Second: the clipboard bar now has a
+  **"Paste to MLBB"** button next to "Paste here" — one tap pastes
+  the copied/cut items straight into the MLBB Assets folder
+  (`Android/data/com.mobile.legends/files/dragon2017/assets`, where
+  her Nov 27 copy landed), no navigation through the blocked screen
+  needed, and the toast says where they went ("... to MLBB Assets").
+  `doPaste` takes a destination now (default: the current folder);
+  `copyRecursive` already creates missing folders, so the paste
+  works even if dragon2017/assets doesn't exist yet.
 - **v1.3.3** — Blocked screen, honest fix (her screenshot, Nov 27):
   the v1.3.1 MLBB jump buttons were a dead end — tapping "Open Mobile
   Legends data" from the blocked Android/data screen just landed on
