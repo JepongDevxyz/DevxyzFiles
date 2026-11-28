@@ -1,10 +1,12 @@
 package com.jepongdevxyz.devxyzfiles
 
+import android.Manifest
 import android.app.Activity
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
@@ -92,6 +94,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
@@ -128,6 +131,27 @@ fun loadAppIcon(context: Context, packageName: String): ImageBitmap? {
 /** Deep link from a pinned desktop shortcut (ShortcutHelper.OPEN_PATH_EXTRA). */
 object DeepLink {
     var pendingPath by mutableStateOf<String?>(null)
+}
+
+/**
+ * Android 9 crash fix (v1.3.7): Environment.isExternalStorageManager() was
+ * added in API 30 (Android 11). Calling it unguarded on API 28 crashed
+ * the app with NoSuchMethodError ~1s after launch — splash, then
+ * "DevxyzFiles keeps stopping" — proven on TestingBot Galaxy S8, Nov 27.
+ * On API 30+ use it; below 30 there is no All Files Access at all, so
+ * the legacy WRITE_EXTERNAL_STORAGE runtime permission is the access
+ * check instead. The API 30 call lives only inside the SDK>=R branch,
+ * so it is never resolved on older phones.
+ */
+fun hasFileAccess(context: Context): Boolean {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        Environment.isExternalStorageManager()
+    } else {
+        ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -203,7 +227,7 @@ fun DevxyzFilesApp() {
     var showMoreMenu by remember { mutableStateOf(false) }
     var showTagsDialog by remember { mutableStateOf(false) }
     var showMlbbSheet by remember { mutableStateOf(false) }
-    var showFilesAccessDialog by remember { mutableStateOf(!Environment.isExternalStorageManager()) }
+    var showFilesAccessDialog by remember { mutableStateOf(!hasFileAccess(context)) }
     var showMlbbStageDialog by remember { mutableStateOf(false) }
     var filesAccessDismissed by remember { mutableStateOf(false) }
 
@@ -326,9 +350,9 @@ fun DevxyzFilesApp() {
         // A copy can only write when All Files Access is on. Check it
         // BEFORE the copy runs — and open the prompt — instead of
         // failing every item with a generic "restricted" message.
-        if (!Environment.isExternalStorageManager()) {
+        if (!hasFileAccess(context)) {
             showFilesAccessDialog = true
-            message = "All Files Access is off — allow it first, then paste again."
+            message = "File access is off — allow it first, then paste again."
             return
         }
         scope.launch {
@@ -762,6 +786,22 @@ fun DevxyzFilesApp() {
         }
     }
 
+    // Legacy storage permission launcher (Android 10 and below only):
+    // on API <30 there is no All Files Access settings page, so the
+    // Allow dialog requests READ + WRITE_EXTERNAL_STORAGE instead.
+    val legacyPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        val ok = granted[Manifest.permission.WRITE_EXTERNAL_STORAGE] == true ||
+            granted[Manifest.permission.READ_EXTERNAL_STORAGE] == true
+        if (ok) {
+            showFilesAccessDialog = false
+            filesAccessDismissed = true
+        } else {
+            message = "File access is off — allow it first, then paste again."
+        }
+    }
+
     // Initial + resume refresh: a SAF grant can be revoked in system
     // settings, so re-probe live on every resume.
     DisposableEffect(lifecycleOwner) {
@@ -774,7 +814,7 @@ fun DevxyzFilesApp() {
                 if (currentPath != HOME_PATH) loadFolder()
                 // All Files Access can be granted/revoked in system settings:
                 // re-check on every resume so the prompt follows reality.
-                if (Environment.isExternalStorageManager()) {
+                if (hasFileAccess(context)) {
                     showFilesAccessDialog = false
                 } else if (!filesAccessDismissed) {
                     showFilesAccessDialog = true
@@ -1472,7 +1512,11 @@ fun DevxyzFilesApp() {
             title = { Text("Allow file access") },
             text = {
                 Text(
-                    "DevxyzFiles needs All Files Access to find your files and copy them — including into Mobile Legends. Without it, folders look empty.",
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        "DevxyzFiles needs All Files Access to find your files and copy them — including into Mobile Legends. Without it, folders look empty."
+                    } else {
+                        "DevxyzFiles needs storage permission to find your files and copy them — including into Mobile Legends. Without it, folders look empty."
+                    },
                     color = HonorColors.Muted
                 )
             },
@@ -1480,11 +1524,27 @@ fun DevxyzFilesApp() {
                 TextButton(
                     onClick = {
                         showFilesAccessDialog = false
-                        val intent = Intent(
-                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                            Uri.parse("package:${context.packageName}")
-                        )
-                        context.startActivity(intent)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                Uri.parse("package:${context.packageName}")
+                            )
+                            try {
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                message = "Couldn't open the settings page."
+                            }
+                        } else {
+                            // Android 10 and below: no All Files Access
+                            // settings page exists — request the legacy
+                            // storage permissions instead.
+                            legacyPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                                )
+                            )
+                        }
                     }
                 ) { Text("Allow", color = HonorColors.AccentBlue) }
             },
